@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阅览室阅览打卡活动</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        body {
+            background-color: #f3f4f6;
+            padding:12px;
+            max-width:720px;
+            margin:0 auto;
+        }
+        .header-card{
+            background:#1e3a63;
+            color:#fff;
+            padding:24px 16px;
+            border-radius:12px;
+            margin-bottom:16px;
+        }
+        .header-card h1{
+            font-size:28px;
+            margin-bottom:8px;
+        }
+        .header-card .week-info{
+            opacity:0.85;
+            font-size:16px;
+        }
+        .tabs{
+            display:flex;
+            background:#fff;
+            border-radius:10px;
+            overflow:hidden;
+            margin-bottom:16px;
+        }
+        .tab-item{
+            flex:1;
+            text-align:center;
+            padding:14px 8px;
+            font-size:17px;
+            border:none;
+            background:#fff;
+        }
+        .tab-item.active{
+            background:#1e3a63;
+            color:#fff;
+        }
+        .panel{
+            background:#fff;
+            border-radius:12px;
+            padding:18px;
+            margin-bottom:14px;
+        }
+        .hidden{display:none !important;}
+        .btn{
+            width:100%;
+            padding:14px;
+            border:none;
+            border-radius:8px;
+            font-size:17px;
+            margin:8px 0;
+        }
+        .btn-primary{background:#2563eb;color:#fff;}
+        .btn-danger{background:#991b1b;color:#fff;}
+        .btn-gray{background:#6b7280;color:#fff;}
+        input{
+            width:100%;
+            padding:13px;
+            border:1px solid #d1d5db;
+            border-radius:8px;
+            margin:8px 0;
+            font-size:16px;
+        }
+        .modal-wrap{
+            position:fixed;
+            inset:0;
+            background:rgba(0,0,0,0.55);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            z-index:999;
+            padding:16px;
+        }
+        .modal-box{
+            background:#fff;
+            width:100%;
+            max-width:420px;
+            border-radius:14px;
+            padding:24px 20px;
+        }
+        .modal-box h2{
+            text-align:center;
+            margin-bottom:20px;
+            font-size:22px;
+        }
+        .qrcode-wrap{
+            text-align:center;
+            margin:16px 0;
+        }
+        .tip-text{
+            font-size:14px;
+            color:#444;
+            line-height:1.6;
+            margin:12px 0;
+        }
+        .record-item{
+            padding:12px 0;
+            border-bottom:1px solid #eee;
+        }
+        .rank-item{
+            display:flex;
+            justify-content:space-between;
+            padding:10px 0;
+            border-bottom:1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+<div class="header-card">
+    <h1>📖阅览室阅览打卡</h1>
+    <div class="week-info">本周：2026/8/24 周一--30周日</div>
+</div>
+
+<div class="tabs">
+    <button class="tab-item active" data-target="tab-check">打卡</button>
+    <button class="tab-item" data-target="tab-rank">周排行榜</button>
+    <button class="tab-item" data-target="tab-mine">我的</button>
+    <button class="tab-item" data-target="tab-admin">管理员</button>
+</div>
+
+<div id="tab-check" class="tab-content">
+    <div class="panel">
+        <div id="check-status">
+            <p class="tip-text">请确保手机开启位置权限，在图书馆阅览室范围内签到打卡。<br>⚠️请勿使用微信浏览器打开，会导致定位失效。</p>
+            <button class="btn btn-primary" id="btn-signin">签到进入阅览室</button>
+            <button class="btn btn-danger hidden" id="btn-signout">签离结束阅览</button>
+            <div id="loc-tip" class="tip-text"></div>
+        </div>
+    </div>
+    <div class="panel">
+        <h3>🎁礼品兑换</h3>
+        <p class="tip-text">累计阅览时长达到要求可兑换小礼品</p>
+        <div id="gift-info"></div>
+        <button class="btn btn-primary" id="btn-exchange">申请兑换礼品</button>
+    </div>
+</div>
+
+<div id="tab-rank" class="tab-content hidden">
+    <div class="panel">
+        <h3>本周阅览时长排行榜</h3>
+        <div id="rank-list"></div>
+    </div>
+</div>
+
+<div id="tab-mine" class="tab-content hidden">
+    <div class="panel">
+        <h3>我的阅览记录</h3>
+        <p>姓名：<span id="my-name">-</span></p>
+        <p>学号：<span id="my-sid">-</span></p>
+        <p>累计总时长(分钟)：<span id="my-total">0</span></p>
+        <p>本周时长(分钟)：<span id="my-week">0</span></p>
+        <div id="my-record-list"></div>
+    </div>
+</div>
+
+<div id="tab-admin" class="tab-content hidden">
+    <div class="panel">
+        <h3>管理员登录</h3>
+        <input type="password" id="admin-pwd" placeholder="输入管理员密码">
+        <button class="btn btn-primary" id="btn-admin-login">登录管理员后台</button>
+
+        <div id="admin-panel" class="hidden">
+            <hr style="margin:16px 0;">
+            <h4>生成打卡二维码</h4>
+            <p class="tip-text">截图下方二维码，打印张贴阅览室；学生扫码参与打卡。<br>⚠️提醒学生：不要微信扫码，请使用手机浏览器打开。</p>
+            <div class="qrcode-wrap">
+                <div id="qrcode-canvas"></div>
+            </div>
+
+            <button class="btn btn-primary" id="btn-export">导出全部打卡记录</button>
+            <button class="btn btn-danger" id="btn-clear">清空全部测试数据</button>
+        </div>
+    </div>
+</div>
+
+<!--弹窗：学生信息录入-->
+<div id="modal-student" class="modal-wrap hidden">
+    <div class="modal-box">
+        <h2>填写读者信息</h2>
+        <input type="text" id="inp-name" placeholder="请输入姓名">
+        <input type="text" id="inp-sid" placeholder="请输入学号">
+        <button class="btn btn-primary" id="btn-save-student">确认进入打卡系统</button>
+    </div>
+</div>
+
+<script>
+// ==========配置区，可自行修改==========
+const CONFIG = {
+    adminKey:"lib2026read",
+    libLat:36.6173,     //图书馆纬度
+    libLon:101.7782,    //图书馆经度
+    radius:50,          //有效范围米
+    giftRequireMin:180, //兑换礼品需要累计分钟
+    giftName:"阅览室纪念小礼品",
+    pageUrl:window.location.
+href
+};
+
+let appData = JSON.parse(localStorage.getItem("readCheckData"))||{records:[],exchangeList:[]};
+let currentStudent = JSON.parse(localStorage.getItem("currentStudent"))||null;
+let signInTime = localStorage.getItem("signInTime")?new Date(localStorage.getItem("signInTime")):null;
+let watchId = null;
+
+//标签切换
+document
+.querySelectorAll(".tab-item").forEach(tab=>{
+    tab
+.onclick=()=>{
+        document
+.querySelectorAll(".tab-item").forEach(x=>x.classList.remove("active"));
+        tab
+.classList.add("active");
+        const target = tab.dataset.target;
+        document
+.querySelectorAll(".tab-content").forEach(p=>p.classList.add("hidden"));
+        document
+.getElementById(target).classList.remove("hidden");
+        renderPage();
+    }
+});
+
+//初始化
+function init(){
+    if(!currentStudent){
+        document
+.getElementById("modal-student").classList.remove("hidden");
+    }else{
+        renderPage();
+        startGeoWatch();
+    }
+    //生成二维码
+    QRCode
+.toCanvas(document.getElementById("qrcode-canvas"),CONFIG.pageUrl,{width:220},err=>{
+        if(err) console.error(err);
+    })
+}
+
+document
+.getElementById("btn-save-student").onclick=()=>{
+    const name = document.getElementById("inp-name").value.trim();
+    const sid = document.getElementById("inp-sid").value.trim();
+    if(!name||!sid){alert("姓名和学号不能为空");return;}
+    currentStudent 
+= {name,sid};
+    localStorage
+.setItem("currentStudent",JSON.stringify(currentStudent));
+    document
+.getElementById("modal-student").classList.add("hidden");
+    startGeoWatch();
+    renderPage();
+}
+
+//定位监听
+function startGeoWatch(){
+    if(!navigator.geolocation){
+        document
+.getElementById("loc-tip").innerText="⚠️你的浏览器不支持定位，请更换系统浏览器";
+        return;
+    }
+    if(watchId!==null) return;
+    watchId 
+= navigator.geolocation.watchPosition(pos=>{
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        const dist = getDistance(lat,lon,CONFIG.libLat,CONFIG.libLon);
+        document
+.getElementById("loc-tip").innerText=`当前距离图书馆：${dist.toFixed(1)}米，有效范围${CONFIG.radius}米`;
+        //已经签到，离开范围自动签离
+        if(signInTime && dist>CONFIG.radius){
+            doSignOut();
+        }
+    },err=>{
+        document
+.getElementById("loc-tip").innerText="定位获取失败，请打开手机位置权限";
+    },{enableHighAccuracy:true,maximumAge:0,timeout:8000})
+}
+
+//计算两点距离米
+function getDistance(lat1,lon1,lat2,lon2){
+    const R = 6371000;
+    const rad = Math.PI/180;
+    const φ1 = lat1*rad,φ2=lat2*rad;
+    const Δφ = (lat2‑lat1)*rad;
+    const Δλ = (lon2‑lon1)*rad;
+    const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+    return R*(2*Math.atan2(Math.sqrt(a),Math.sqrt(1‑a)));
+}
+
+//签到
+document
+.getElementById("btn-signin").onclick=async ()=>{
+    if(!currentStudent){return;}
+    const pos = await getOncePosition();
+    if(!pos){alert("获取位置失败");return;}
+    const d = getDistance(pos.coords.latitude,pos.coords.longitude,CONFIG.libLat,CONFIG.libLon);
+    if(d>CONFIG.radius){
+        alert(`不在阅览室有效范围内，当前距离${d.toFixed(1)}米，不能签到`);
+        return;
+    }
+    signInTime 
+= new Date();
+    localStorage
+.setItem("signInTime",signInTime.toISOString());
+    toggleSignBtn(true);
+}
+
+//单次获取定位
+function getOncePosition(){
+    return new Promise(resolve=>{
+        navigator
+.geolocation.getCurrentPosition(p=>resolve(p),e=>resolve(null),{enableHighAccuracy:true})
+    })
+}
+
+//签离
+document
+.getElementById("btn-signout").onclick=()=>doSignOut();
+
+function doSignOut(){
+    if(!signInTime||!currentStudent) return;
+    const end = new Date();
+    const durationMin = Math.round((end.getTime()-signInTime.getTime())/60000);
+    if(durationMin>=1){
+        appData
+.records.push({
+            name:currentStudent.name,
+            sid:currentStudent.sid,
+            in:signInTime.toISOString(),
+            out:end.toISOString(),
+            duration:
+durationMin
+        });
+        saveData();
+    }
+    signInTime
+=null;
+    localStorage
+.removeItem("signInTime");
+    toggleSignBtn(false);
+    renderPage();
+}
+
+function toggleSignBtn(isSign){
+    if(isSign){
+        document
+.getElementById("btn-signin").classList.add("hidden");
+        document
+.getElementById("btn-signout").classList.remove("hidden");
+    }else{
+        document
+.getElementById("btn-signin").classList.remove("hidden");
+        document
+.getElementById("btn-signout").classList.add("hidden");
+    }
+}
+
+//保存本地存储
+function saveData(){
+    localStorage
+.setItem("readCheckData",JSON.stringify(appData));
+}
+
+//管理员登录
+document
+.getElementById("btn-admin-login").onclick=()=>{
+    const p = document.getElementById("admin-pwd").value.trim();
+    if(p===CONFIG.adminKey){
+        document
+.getElementById("admin-panel").classList.remove("hidden");
+        alert("管理员登录成功");
+    }else{
+        alert("密钥错误");
+    }
+}
+
+//导出csv
+document
+.getElementById("btn-export").onclick=()=>{
+    let text = "姓名,学号,打卡时间,签离时间,时长(分钟)\n";
+    appData
+.records.forEach(r=>{
+        text 
++= `${r.name},${r.sid},${r.in},${r.out},${r.duration}\n`;
+    })
+    const blob = new Blob([text],{type:"text/csv;charset=utf‑8"});
+    const a = document.createElement("a");
+    a
+.href = URL.createObjectURL(blob);
+    a
+.download="阅览室打卡记录.csv";
+    a
+.click();
+}
+
+//清空数据
+document
+.getElementById("btn-clear").onclick=()=>{
+    if(confirm("确认清空全部打卡测试数据？不可恢复！")){
+        localStorage
+.removeItem("readCheckData");
+        localStorage
+.removeItem("currentStudent");
+        localStorage
+.removeItem("signInTime");
+        appData
+={records:[],exchangeList:[]};
+        currentStudent
+=null;
+        signInTime
+=null;
+        alert("数据已清空，页面将刷新");
+        location
+.reload();
+    }
+}
+
+//礼品兑换
+document
+.getElementById("btn-exchange").onclick=()=>{
+    if(!currentStudent) return;
+    const total = getStudentTotalMin(currentStudent.sid);
+    if(total >= CONFIG.giftRequireMin){
+        appData
+.exchangeList.push({sid:currentStudent.sid,name:currentStudent.name,time:new Date().toISOString(),gift:CONFIG.giftName});
+        saveData();
+        alert(`恭喜！累计${total}分钟，已登记申请【${CONFIG.giftName}】，请到阅览室前台领取`);
+    }else{
+        alert(`累计阅览时长${total}分钟，还需要${CONFIG.giftRequireMin‑total}分钟才可兑换礼品`);
+    }
+}
+
+function getStudentTotalMin(sid){
+    return appData.records.filter(r=>r.sid===sid).reduce((s,i)=>s+i.duration,0);
+}
+
+//渲染页面
+function renderPage(){
+    if(!currentStudent) return;
+    //我的页面
+    document
+.getElementById("my-name").innerText = currentStudent.name;
+    document
+.getElementById("my-sid").innerText = currentStudent.sid;
+    const total = getStudentTotalMin(currentStudent.sid);
+    document
+.getElementById("my-total").innerText = total;
+    document
+.getElementById("gift-info").innerText = `兑换条件：累计阅览${CONFIG.giftRequireMin}分钟，礼品：${CONFIG.giftName}`;
+    toggleSignBtn(!!signInTime);
+
+    //排行榜
+    const map = {};
+    appData
+.records.forEach(r=>{
+        if(!map[r.sid]) map[r.sid]={name:r.name,sum:0};
+        map
+[r.sid].sum += r.duration;
+    })
+    const arr = Object.values(map).sort((a,b)=>b.sum‑a.sum);
+    let rankHtml = "";
+    arr
+.forEach((item,idx)=>{
+        rankHtml 
++= `<div class="rank-item"><span>${idx+1}. ${item.name}</span><span>${item.sum}分钟</span></div>`
+    })
+    document
+.getElementById("rank-list").innerHTML = rankHtml||"<p>暂无打卡数据</p>";
+}
+
+window
+.onload = init;
+</script>
+</body>
+</html>
