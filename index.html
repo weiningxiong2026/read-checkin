@@ -1,120 +1,276 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>阅览室打卡</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
-    body{background:#f4f7fa;color:#222;font-size:16px;padding-bottom:80px;}
-    .header{background:#2196F3;color:#fff;padding:18px 16px;display:flex;justify-content:space-between;align-items:center;}
-    .header h1{font-size:20px;display:flex;align-items:center;gap:8px;}
-    .btn-switch{background:rgba(255,255,255,0.22);border:none;color:#fff;border-radius:20px;padding:6px 14px;font-size:16px;}
-    .warn-bar{background:#fff3cd;color:#856404;padding:14px 16px;margin:12px;border-radius:12px;display:flex;align-items:center;gap:8px;}
-    .refresh-icon{margin-left:auto;}
-    .card{background:#fff;border-radius:16px;margin:12px;padding:24px;text-align:center;box-shadow:0 1px 4px #00000014;}
-    .status-tag{display:inline-block;background:#e9ecef;color:#444;padding:4px 12px;border-radius:14px;font-size:14px;margin-bottom:12px;}
-    .time-big{font-size:42px;font-weight:bold;color:#222;margin:12px 0;}
-    .time-desc{color:#666;margin-bottom:20px;}
-    .btn-disabled{width:100%;padding:18px;border-radius:12px;border:none;background:#ced4da;color:#666;font-size:18px;}
-    .row-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 12px;}
-    .mini-card{background:#fff;padding:20px 12px;border-radius:16px;box-shadow:0 1px 4px #00000014;}
-    .mini-card .num{font-size:28px;font-weight:bold;margin:4px 0;}
-    .mini-card .lab{color:#666;font-size:14px;}
-    .tab-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;border-top:1px solid #ddd;}
-    .tab-item{flex:1;text-align:center;padding:12px 4px;color:#666;font-size:14px;}
-    .tab-item.active{color:#2196F3;}
-    .modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:999;}
-    .modal-box{background:#fff;border-radius:18px;width:100%;max-width:420px;padding:30px 24px;text-align:center;}
-    .modal-box .lock-icon{font-size:60px;margin-bottom:12px;}
-    .modal-box h2{font-size:24px;margin-bottom:10px;}
-    .modal-box .sub-text{color:#666;margin-bottom:22px;font-size:16px;}
-    .inp{width:100%;border:2px solid #73b8ff;border-radius:12px;padding:14px;font-size:18px;margin-bottom:24px;outline:none;}
-    .btns-row{display:flex;gap:14px;}
-    .btn-cancel{flex:1;padding:16px;border-radius:12px;border:none;background:#eee;font-size:18px;}
-    .btn-login{flex:1;padding:16px;border-radius:12px;border:none;background:linear-gradient(90deg,#ff9500,#ff6600);color:#fff;font-size:18px;}
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>阅览室阅览打卡活动</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui, sans-serif}
+body{background:#f5f7fa;color:#222;padding:12px;max-width:720px;margin:0 auto}
+.header{background:#2b7bcc;color:#fff;padding:16px;border-radius:10px;margin-bottom:12px}
+.card{background:#fff;border-radius:10px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px #00000018}
+.time-display{font-size:42px;font-weight:bold;text-align:center;margin:20px 0}
+.btn{width:100%;padding:14px;font-size:17px;border:none;border-radius:8px;margin:6px 0}
+.btn-start{background:#2b7bcc;color:#fff}
+.btn-stop{background:#d63031;color:#fff}
+.btn:disabled{background:#bbbbbb;color:#666}
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat-item{text-align:center;padding:14px;background:#f0f4f9;border-radius:8px}
+.rank-item{padding:10px;border-bottom:1px solid #eee}
+.tab-bar{display:flex;margin-top:10px}
+.tab{flex:1;text-align:center;padding:12px;background:#e9edf4}
+.tab.active{background:#2b7bcc;color:white}
+.page{display:none}
+.page.active{display:block}
+.tip{color:#c0392b;font-size:14px;margin:8px 0}
+.green{color:#008736}
+.grey{color:#777}
+</style>
 </head>
 <body>
 <div class="header">
-  <h1>📚 阅览室打卡</h1>
-  <button class="btn-switch" onclick="toggleMode()">切换</button>
+<h2>📖阅览室阅览打卡</h2>
+<div id="weekInfo"></div>
 </div>
-
-<div class="warn-bar">
-  <span>⚠️</span>
-  <span id="warnText">未设置图书馆位置，请扫码或联系管理员</span>
-  <span class="refresh-icon" onclick="window.location.reload()">🔄</span>
-</div>
-
-<div class="card">
-  <div class="status-tag" id="statusTag">未签到</div>
-  <div class="time-big" id="todayTime">00:00:00</div>
-  <div class="time-desc">今日阅览时长<br><span id="tipSign">在范围内点击签到</span></div>
-  <button id="mainBtn" class="btn-disabled">未设置位置</button>
-</div>
-
-<div class="row-two">
-  <div class="mini-card">
-    <div>⏱️</div>
-    <div class="num" id="totalMin">0</div>
-    <div class="lab">累计总时长</div>
-  </div>
-  <div class="mini-card">
-    <div>📅</div>
-    <div class="num" id="dayCount">0</div>
-    <div class="lab">打卡天数</div>
-  </div>
-</div>
-
 <div class="tab-bar">
-  <div class="tab-item active">📍打卡</div>
-  <div class="tab-item">🏆排行</div>
-  <div class="tab-item">👤我的</div>
+<div class="tab active" onclick="switchTab('tabCheckin')">打卡</div>
+<div class="tab" onclick="switchTab('tabRank')">周排行榜</div>
+<div class="tab" onclick="switchTab('tabMine')">我的</div>
 </div>
-
-<!-- 管理员登录弹窗，已移除明文密码提示文字 -->
-<div class="modal-wrap" id="adminModal">
-  <div class="modal-box">
-    <div class="lock-icon">🔐</div>
-    <h2>管理员登录</h2>
-    <div class="sub-text">请输入管理员密码以进入管理后台</div>
-    <input class="inp" id="pwdInput" placeholder="请输入密码"/>
-    <div class="btns-row">
-      <button class="btn-cancel" onclick="closeAdminModal()">取消</button>
-      <button class="btn-login" onclick="checkAdminPwd()">登录</button>
-    </div>
-  </div>
+<div id="tabCheckin" class="page active">
+<div class="card">
+<div id="areaTip" class="tip"></div>
+<div class="time-display" id="timerText">00:00:00</div>
+<button class="btn btn-start" id="btnStart" onclick="startCheckin()">开始阅览计时</button>
+<button class="btn btn-stop" id="btnStop" onclick="stopCheckin()" disabled>结束阅览计时</button>
 </div>
-
+<div class="card stat-row">
+<div class="stat-item">
+<div>本周时长</div>
+<div id="weekHour" style="font-size:22px">0h</div>
+</div>
+<div class="stat-item">
+<div>总累计时长</div>
+<div id="totalHour" style="font-size:22px">0h</div>
+</div>
+</div>
+<div class="card">
+<h4>活动规则</h4>
+<p style="font-size:14px;line-height:1.7">
+1.必须在图书馆阅览室40米范围内才可开启计时；离开范围自动暂停计时。<br>
+2.统计周期：周一00:00‑周日24:00；单周累计＞3小时进入本周排行榜。<br>
+3.按本周时长从高到低排名，每周达标可参与奖品兑换，不限次数。
+</p>
+</div>
+</div>
+<div id="tabRank" class="page">
+<div class="card">
+<h3>📊本周排行榜（仅>3小时有效上榜）</h3>
+<div id="rankList"></div>
+</div>
+</div>
+<div id="tabMine" class="page">
+<div class="card">
+<h3>我的阅览记录</h3>
+<p>打卡总天数：<span id="dayCount">0</span></p>
+<p>总累计小时：<span id="myTotal">0</span></p>
+<p>本周小时：<span id="myWeek">0</span></p>
+<p id="weekValidTip"></p>
+<button class="btn" onclick="exportData()">导出本机记录文本</button>
+</div>
+</div>
 <script>
-// ==========管理员密码（源码内保留，页面UI不再展示）==========
-const ADMIN_PWD = "admin123";
-let sitePos = JSON.parse(localStorage.getItem("lib_pos")||"null");
-let userData = JSON.parse(localStorage.getItem("user_info")||'{"name":"","stuId":""}');
-let signState = JSON.parse(localStorage.getItem("sign_state")||'{"sign":false,"signInTime":null}');
-
-function toggleMode(){
-  document
-.getElementById("adminModal").style.display="flex";
+// =========【固化图书馆地理围栏参数】=========
+const CONFIG = {
+  libLat: 36.600556,
+  libLng: 101.757222,
+  radiusMeter: 40,
+  weekMinHour:3
+};
+// Haversine 计算两点距离米
+function getDistance(lat1,lng1,lat2,lng2){
+  const R=6371000;
+  const rad=Math.PI/180;
+  const φ1=lat1*rad,φ2=lat2*rad;
+  const Δφ=(lat2-lat1)*rad;
+  const Δλ=(lng2-lng1)*rad;
+  const a=Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return R*(2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
 }
-function closeAdminModal(){
-  document
-.getElementById("adminModal").style.display="none";
-  document
-.getElementById("pwdInput").value="";
+// 获取当前属于哪一周（周一为一周起点）返回 {start,end,key}
+function getWeekInfo(d=new Date()){
+  const date=new Date(d);
+  const day=date.getDay();
+  const diff=(day===0?-6:1-day);
+  const monday=new Date(date);
+  monday.setDate(date.getDate()+diff);
+  monday.setHours(0,0,0,0);
+  const sunday=new Date(monday);
+  sunday.setDate(monday.getDate()+6);
+  sunday.setHours(23,59,59,999);
+  const key=monday.toLocaleDateString();
+  return {start:monday, end:sunday, key};
 }
-function checkAdminPwd(){
-  let val = document.getElementById("pwdInput").value.trim();
-  if(val===ADMIN_PWD){
-    closeAdminModal();
-    alert("登录成功，进入管理员后台");
-    //管理员页面跳转，这里为完整兼容原有逻辑
+// 本地存储读写
+const STORAGE_KEY="readCheckinData";
+function loadData(){
+  const raw=localStorage.getItem(STORAGE_KEY);
+  if(!raw) return {records:[],isRunning:false,runningStart:null,totalMs:0};
+  return JSON.parse(raw);
+}
+function saveData(d){
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(d));
+}
+let appData=loadData();
+let timer=null;
+let currentPosition=null;
+// UI刷新
+function renderUI(){
+  const wi=getWeekInfo();
+  document.getElementById("weekInfo").innerText=`本周：${wi.key} 周一‑周日`;
+  // 计时显示
+  if(appData.isRunning&&appData.runningStart){
+    const now=Date.now();
+    const elapsed=now-appData.runningStart;
+    setTimerText(elapsed);
   }else{
-    alert("密码错误");
+    setTimerText(0);
+  }
+  document.getElementById("btnStart").disabled=appData.isRunning;
+  document.getElementById("btnStop").disabled=!appData.isRunning;
+  const {weekMs,totalMs,dayCnt}=calcStat();
+  const weekH=(weekMs/(1000*3600)).toFixed(2);
+  const totalH=(totalMs/(1000*3600)).toFixed(2);
+  document.getElementById("weekHour").innerText=weekH+" h";
+  document.getElementById("totalHour").innerText=totalH+" h";
+  document.getElementById("dayCount").innerText=dayCnt;
+  document.getElementById("myTotal").innerText=totalH+" 小时";
+  document.getElementById("myWeek").innerText=weekH+" 小时";
+  const valid=parseFloat(weekH)>CONFIG.weekMinHour;
+  document.getElementById("weekValidTip").innerText=valid
+    ?`<span class="green">✅本周超过3小时，可参与奖品兑换</span>`
+    :`<span class="grey">⚠️本周不足3小时，不参与本周排名</span>`;
+  renderRank();
+}
+function setTimerText(ms){
+  const s=Math.floor(ms/1000);
+  const h=Math.floor(s/3600);
+  const m=Math.floor((s%3600)/60);
+  const sec=s%60;
+  document.getElementById("timerText").innerText
+    =String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0");
+}
+// 统计计算
+function calcStat(){
+  const wi=getWeekInfo();
+  let weekMs=0,totalMs=0;
+  const daySet=new Set();
+  appData.records.forEach(r=>{
+    const t=new Date(r.endTime);
+    totalMs+=r.durationMs||0;
+    if(t>=wi.start&&t<=wi.end){
+      weekMs+=r.durationMs||0;
+    }
+    const dStr=t.toLocaleDateString();
+    daySet.add(dStr);
+  });
+  return {weekMs,totalMs,dayCnt:daySet.size};
+}
+// 渲染排行榜（本机仅自己数据；多用户需要后端）
+function renderRank(){
+  const box=document.getElementById("rankList");
+  const {weekMs}=calcStat();
+  const wh=weekMs/(1000*3600);
+  if(wh>CONFIG.weekMinHour){
+    box.innerHTML=`<div class="rank-item">🏆你：${wh.toFixed(2)} 小时（达标上榜）</div>`;
+  }else{
+    box.innerHTML=`<div class="rank-item grey">本周时长不足3小时，未上榜</div>`;
   }
 }
-//页面初始化逻辑省略（保留原有全部业务逻辑，仅删除界面密码文字）
+// 定位循环监听
+function watchPosition(){
+  if(!navigator.geolocation){
+    document.getElementById("areaTip").innerText="⚠️浏览器不支持定位，请更换手机系统浏览器";
+    return;
+  }
+  navigator.geolocation.watchPosition(
+    pos=>{
+      currentPosition={lat:pos.coords.latitude,lng:pos.coords.longitude};
+      const dist=getDistance(currentPosition.lat,currentPosition.lng,CONFIG.libLat,CONFIG.libLng);
+      if(dist<=CONFIG.radiusMeter){
+        document.getElementById("areaTip").innerHTML="✅已在阅览室围栏内，可以开始计时";
+      }else{
+        document.getElementById("areaTip").innerHTML=`⚠️离开阅览区域(${Math.round(dist)}米)，计时将自动暂停`;
+        if(appData.isRunning){
+          stopCheckin();
+        }
+      }
+    },
+    err=>{
+      document.getElementById("areaTip").innerText="❌获取位置失败，请开启GPS并允许位置权限";
+    },
+    {enableHighAccuracy:true,maximumAge:2000,timeout:8000}
+  );
+}
+// 开始计时
+function startCheckin(){
+  if(!currentPosition){alert("正在获取位置，请稍候");return;}
+  const dist=getDistance(currentPosition.lat,currentPosition.lng,CONFIG.libLat,CONFIG.libLng);
+  if(dist>CONFIG.radiusMeter){
+    alert("不在阅览室40米范围内，不能开启计时");
+    return;
+  }
+  appData.isRunning=true;
+  appData.runningStart=Date.now();
+  saveData(appData);
+  startTimerTick();
+  renderUI();
+}
+function stopCheckin(){
+  if(!appData.isRunning) return;
+  const end=Date.now();
+  const dur=end-appData.runningStart;
+  appData.records.push({
+    startTime:appData.runningStart,
+    endTime:end,
+    durationMs:dur
+  });
+  appData.isRunning=false;
+  appData.runningStart=null;
+  saveData(appData);
+  stopTimerTick();
+  renderUI();
+}
+function startTimerTick(){
+  stopTimerTick();
+  timer=setInterval(()=>{
+    if(appData.isRunning&&appData.runningStart){
+      setTimerText(Date.now()-appData.runningStart);
+    }
+  },1000);
+}
+function stopTimerTick(){
+  if(timer){clearInterval(timer);timer=null;}
+}
+// tab切换
+function switchTab(id){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  event.target.classList.add("active");
+}
+function exportData(){
+  const txt=JSON.stringify(appData,null,2);
+  const blob=new Blob([txt],{type:"text/plain"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="阅览打卡记录.txt";
+  a.click();
+}
+// 初始化
+watchPosition();
+renderUI();
+if(appData.isRunning) startTimerTick();
 </script>
 </body>
 </html>
