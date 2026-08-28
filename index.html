@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阅览室阅览打卡活动</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui, sans-serif;}
+        body{background:#f5f7fa;color:#222;padding:12px;max-width:720px;margin:0 auto}
+        .header{background:#2b7bcc;color:#fff;padding:16px;border-radius:10px;margin-bottom:12px;}
+        .card{background:#fff;border-radius:10px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px #00000018;}
+        .time-display{font-size:42px;font-weight:bold;text-align:center;margin:20px 0;}
+        .btn{width:100%;padding:14px;font-size:17px;border:none;border-radius:8px;margin:6px 0;}
+        .btn-start{background:#2b7bcc;color:#fff;}
+        .btn-stop{background:#d63031;color:#fff;}
+        .btn-admin{background:#27ae60;color:#fff;}
+        .btn:disabled{background:#bbbbbb;color:#666;}
+        .stat-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+        .stat-item{text-align:center;padding:14px;background:#f0f4f9;border-radius:8px;}
+        .rank-item{padding:10px;border-bottom:1px solid #eee;}
+        .tab-bar{display:flex;margin-top:10px;}
+        .tab{flex:1;text-align:center;padding:12px;background:#e9edf4;}
+        .tab.active{background:#2b7bcc;color:white;}
+        .page{display:none;}
+        .page.active{display:block;}
+        .tip{color:#c0392b;font-size:14px;margin:8px 0;}
+        .green{color:#008736;}
+        .grey{color:#777;}
+        input{width:100%;padding:12px;border:1px solid #ccc;border-radius:8px;font-size:16px;margin:6px 0;}
+        .modal{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;padding:20px;z-index:99;}
+        .modal-content{background:white;width:100%;max-width:420px;padding:24px;border-radius:12px;text-align:center;}
+        .prize-item{border:1px solid #ddd;padding:12px;border-radius:8px;margin:8px 0;}
+    </style>
+</head>
+<body>
+<div class="header">
+    <h2>📖阅览室阅览打卡</h2>
+    <div id="weekInfo"></div>
+</div>
+
+<div class="tab-bar">
+    <div class="tab active" data-target="pageCheck">打卡</div>
+    <div class="tab" data-target="pageRank">周排行榜</div>
+    <div class="tab" data-target="pageMine">我的</div>
+    <div class="tab" data-target="pageAdmin">管理员</div>
+</div>
+
+<!-- 学生身份填写弹窗 -->
+<div id="loginModal" class="modal">
+    <div class="modal-content">
+        <h3>请填写读者信息</h3>
+        <input id="stuName" placeholder="请输入真实姓名">
+        <input id="stuId" placeholder="请输入学号/证件号">
+        <button class="btn btn-start" onclick="saveStudentInfo()">确认进入打卡</button>
+    </div>
+</div>
+
+<!-- 打卡主页面 -->
+<div id="pageCheck" class="page active">
+    <div class="card">
+        <div id="locTip" class="tip">正在获取图书馆定位……</div>
+        <div class="time-display" id="timeShow">00:00:00</div>
+        <button id="btnIn" class="btn btn-start" onclick="checkIn()">签到进入阅览室</button>
+        <button id="btnOut" class="btn btn-stop" onclick="checkOut()" disabled>签退离开阅览室</button>
+        <div class="tip">⚠️必须在图书馆范围内签到；离开阅览室范围计时会自动停止。</div>
+    </div>
+    <div class="card">
+        <h3>礼品兑换</h3>
+        <div id="prizeList"></div>
+    </div>
+</div>
+
+<!-- 排行榜页面 -->
+<div id="pageRank" class="page">
+    <div class="card">
+        <h3>本周阅览时长排行榜</h3>
+        <div id="rankList"></div>
+    </div>
+</div>
+
+<!-- 我的页面 -->
+<div id="pageMine" class="page">
+    <div class="card">
+        <h3>我的阅览信息</h3>
+        <p>姓名：<span id="myName">-</span></p>
+        <p>学号：<span id="myStuId">-</span></p>
+        <div class="stat-row">
+            <div class="stat-item">
+                <div>本周累计</div>
+                <div class="green" id="weekTotal">0h0m</div>
+            </div>
+            <div class="stat-item">
+                <div>总累计时长</div>
+                <div class="green" id="allTotal">0h0m</div>
+            </div>
+        </div>
+        <h4 style="margin-top:16px;">打卡记录</h4>
+        <div id="myRecord"></div>
+    </div>
+</div>
+
+<!-- 管理员页面 -->
+<div id="pageAdmin" class="page">
+    <div class="card">
+        <h3>管理员登录</h3>
+        <input id="adminPwd" type="password" placeholder="输入管理员密钥">
+        <button class="btn btn-admin" onclick="adminLogin()">解锁管理面板</button>
+        <div id="adminPanel" style="display:none;">
+            <hr style="margin:12px 0;">
+            <h4>打卡二维码</h4>
+            <div id="qrModal" class="modal">
+                <div class="modal-content">
+                    <h3>读者扫码打卡</h3>
+                    <p style="margin:20px 0;font-size:17px;">复制本页面网址，使用在线二维码工具生成二维码<br>截图保存，打印张贴阅览室。<br>仅打开打卡页面，不能进入管理员</p>
+                    <button class="btn btn-start" onclick="closeQrModal()">关闭</button>
+                </div>
+            </div>
+            <button class="btn btn-start" onclick="openQrModal()">生成打卡二维码提示</button>
+            <button class="btn btn-start" onclick="exportAllData()">导出全部打卡记录</button>
+            <button class="btn btn-stop" onclick="clearAllData()">清空全部测试数据</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==========配置区==========
+const ADMIN_KEY = "lib2026read";
+//图书馆经纬度，青海建筑职业技术学院图书馆
+const LIB_LAT = 36.6232;
+const LIB_LNG = 101.7781;
+const GEOFENCE_RADIUS = 80; //米
+//礼品配置：需要累计分钟数
+const PRIZES = [
+    {min:300,name:"笔记本",desc:"累计阅览5小时兑换"},
+    {min:600,name:"书签套装",desc:"累计阅览10小时兑换"},
+    {min:1000,name:"文创水杯",desc:"累计阅览约16.7小时兑换"}
+];
+// =========================
+
+let appData = JSON.parse(localStorage.getItem("readCheckData"))||{
+    studentMap:{}, //key:stuId, value学生信息
+    records:[],
+    weekStart:getWeekStart()
+};
+let currentStu = null;
+let timer = null;
+let timingStart = null;
+let nowPositionOk = false;
+
+//页面初始化
+init();
+
+function init(){
+    bindTab();
+    renderWeekInfo();
+    renderPrize();
+    renderRank();
+    checkStudentLocal();
+    startLocationWatch();
+}
+
+//学生本地身份校验
+function checkStudentLocal(){
+    const local = localStorage.getItem("currentStudent");
+    if(local){
+        currentStu = JSON.parse(local);
+        fillMinePage();
+    }else{
+        document.getElementById("loginModal").style.display="flex";
+    }
+}
+
+//保存学生姓名学号
+function saveStudentInfo(){
+    const name = document.getElementById("stuName").value.trim();
+    const sid = document.getElementById("stuId").value.trim();
+    if(!name||!sid){alert("请填写姓名和学号");return;}
+    currentStu = {name:name, sid:sid};
+    localStorage.setItem("currentStudent",JSON.stringify(currentStu));
+    if(!appData.studentMap[sid]){
+        appData.studentMap[sid] = {name:name, totalMin:0, weekMin:0};
+    }
+    saveAppData();
+    document.getElementById("loginModal").style.display="none";
+    fillMinePage();
+    renderRank();
+}
+
+//填充我的页面
+function fillMinePage(){
+    document.getElementById("myName").innerText = currentStu.name;
+    document.getElementById("myStuId").innerText = currentStu.sid;
+    const stu = appData.studentMap[currentStu.sid];
+    document.getElementById("weekTotal").innerText = minToHM(stu.weekMin);
+    document.getElementById("allTotal").innerText = minToHM(stu.totalMin);
+    const myRec = appData.records.filter(r=>r.sid===currentStu.sid).reverse();
+    let html = "";
+    myRec.forEach(r=>{
+        html += `<div class="rank-item">${r.timeStr}｜时长：${minToHM(r.duration)}</div>`
+    });
+    document.getElementById("myRecord").innerHTML = html||"<div class='grey'>暂无打卡记录</div>";
+}
+
+//标签切换
+function bindTab(){
+    const tabs = document.querySelectorAll(".tab");
+    tabs.forEach(tab=>{
+        tab.onclick=()=>{
+            tabs.forEach(t=>t.classList.remove("active"));
+            tab.classList.add("active");
+            const target = tab.dataset.target;
+            document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+            document.getElementById(target).classList.add("active");
+        }
+    })
+}
+
+//获取本周周一零点
+function getWeekStart(){
+    const d = new Date();
+    const day = d.getDay();
+    const offset = day===0?-6:1-day;
+    const monday = new Date(d.setDate(d.getDate()+offset));
+    monday.setHours(0,0,0,0);
+    return monday.getTime();
+}
+
+//渲染周信息
+function renderWeekInfo(){
+    const ws = new Date(appData.weekStart);
+    const we = new Date(ws.getTime()+6*24*3600*1000);
+    document.getElementById("weekInfo").innerText = `本周：${ws.getFullYear()}/${ws.getMonth()+1}/${ws.getDate()} 周一‑${we.getDate()}周日`;
+}
+
+//礼品列表渲染
+function renderPrize(){
+    let html = "";
+    PRIZES.forEach(p=>{
+        html += `<div class="prize-item">
+            <b>${p.name}</b> <br>${p.desc}
+        </div>`
+    })
+    document.getElementById("prizeList").innerHTML = html;
+}
+
+//距离计算 haversine
+function getDistance(lat1,lng1,lat2,lng2){
+    const R = 6371000;
+    const rad = Math.PI/180;
+    const φ1 = lat1*rad,φ2=lat2*rad;
+    const Δφ = (lat2‑lat1)*rad;
+    const Δλ = (lng2‑lng1)*rad;
+    const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+    return R * (2*Math.atan2(Math.sqrt(a),Math.sqrt(1‑a)));
+}
+
+//持续监听定位
+function startLocationWatch(){
+    if(!navigator.geolocation){
+        document.getElementById("locTip").innerText = "⚠️浏览器不支持定位，请更换手机系统浏览器";
+        return;
+    }
+    navigator.geolocation.watchPosition(pos=>{
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const dist = getDistance(lat,lng,LIB_LAT,LIB_LNG);
+        nowPositionOk = dist <= GEOFENCE_RADIUS;
+        if(nowPositionOk){
+            document.getElementById("locTip").innerHTML = `<span class="green">✅已在图书馆范围内，距离${Math.round(dist)}米</span>`;
+            if(timingStart){
+                //还在计时
+            }
+        }else{
+            document.getElementById("locTip").innerText = `⚠️不在图书馆有效范围，距离${Math.round(dist)}米，计时将停止`;
+            if(timingStart){
+                checkOut(); //离开围栏自动签退
+            }
+        }
+    },err=>{
+        document.getElementById("locTip").innerText = "定位失败，请开启手机定位权限";
+    },{enableHighAccuracy:true,maximumAge:10000});
+}
+
+//签到
+function checkIn(){
+    if(!currentStu){alert("请先填写读者信息");return;}
+    if(!nowPositionOk){alert("必须在图书馆范围内才能签到");return;}
+    timingStart = Date.now();
+    document.getElementById("btnIn").disabled=true;
+    document.getElementById("btnOut").disabled=false;
+    runTimer();
+}
+
+//签退
+function checkOut(){
+    if(!timingStart) return;
+    clearInterval(timer);
+    const ms = Date.now()‑timingStart;
+    const durationMin = Math.round(ms / 60000);
+    timingStart = null;
+    document.getElementById("timeShow").innerText = "00:00:00";
+    document.getElementById("btnIn").disabled=false;
+    document.getElementById("btnOut").disabled=true;
+    if(durationMin>=1){
+        const rec = {
+            sid:currentStu.sid,
+            name:currentStu.name,
+            timeStr:new Date().toLocaleString(),
+            duration:durationMin,
+            ts:Date.now()
+        };
+        appData.records.push(rec);
+        const stuObj = appData.studentMap[currentStu.sid];
+        stuObj.totalMin += durationMin;
+        stuObj.weekMin += durationMin;
+        saveAppData();
+        fillMinePage();
+        renderRank();
+        alert(`阅览结束，本次时长：${minToHM(durationMin)}`);
+    }
+}
+
+//计时器
+function runTimer(){
+    clearInterval(timer);
+    timer = setInterval(()=>{
+        const sec = Math.floor((Date.now()‑timingStart)/1000);
+        const h = Math.floor(sec/3600);
+        const m = Math.floor((sec%3600)/60);
+        const s = sec%60;
+        document.getElementById("timeShow").innerText = `${pad(h)}:${pad(m)}:${pad(s)}`;
+    },1000);
+}
+
+function pad(n){return n.toString().padStart(2,"0")}
+
+function minToHM(min){
+    const h = Math.floor(min/60);
+    const m = min%60;
+    return `${h}h${m}m`;
+}
+
+//排行榜
+function renderRank(){
+    const arr = Object.values(appData.studentMap).sort((a,b)=>b.weekMin‑a.weekMin);
+    let html = "";
+    arr.forEach((item,idx)=>{
+        html += `<div class="rank-item">${idx+1}. ${item.name}｜${minToHM(item.weekMin)}</div>`
+    })
+    document.getElementById("rankList").innerHTML = html||"<div class='grey'>暂无打卡数据</div>";
+}
+
+//存储
+function saveAppData(){
+    localStorage.setItem("readCheckData",JSON.stringify(appData));
+}
+
+//管理员登录
+function adminLogin(){
+    const pwd = document.getElementById("adminPwd").value.trim();
+    if(pwd === ADMIN_KEY){
+        document.getElementById("adminPanel").style.display="block";
+        alert("管理员解锁成功");
+    }else{
+        alert("密钥错误");
+    }
+}
+
+function openQrModal(){
+    document.getElementById("qrModal").style.display="flex";
+}
+function closeQrModal(){
+    document.getElementById("qrModal").style.display="none";
+}
+
+//导出csv
+function exportAllData(){
+    let csv = "姓名,学号,打卡时间,时长(分钟)\n";
+    appData.records.forEach(r=>{
+        csv += `${r.name},${r.sid},${r.timeStr},${r.duration}\n`
+    })
+    const blob = new Blob([csv],{type:"text/csv;charset=utf‑8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "阅览室打卡记录.csv";
+    a.click();
+}
+
+function clearAllData(){
+    if(confirm("确认清空全部打卡测试数据？此操作不可恢复！")){
+        localStorage.removeItem("readCheckData");
+        localStorage.removeItem("currentStudent");
+        location.reload();
+    }
+}
+</script>
+</body>
+</html>
