@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>阅览室阅览打卡活动</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui, sans-serif;}
+body{background:#f4f6f8;padding:16px;color:#222;}
+.header{background:#23396b;color:#fff;padding:32px 20px;border-radius:16px;margin-bottom:16px;}
+.header h1{font-size:22px;margin-bottom:8px;}
+.header p{opacity:0.9;font-size:14px;}
+.tabs{display:flex;margin-bottom:16px;}
+.tab{flex:1;padding:12px 6px;text-align:center;border:1px solid #ccc;background:#fff;cursor:pointer;}
+.tab.active{background:#23396b;color:#fff;border-color:#23396b;}
+.panel{display:none;background:#fff;padding:20px;border-radius:12px;}
+.panel.show{display:block;}
+.form-item{margin-bottom:14px;}
+.form-item label{display:block;margin-bottom:6px;font-weight:500;font-size:14px;}
+.form-item input{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:16px;}
+.btn{width:100%;padding:12px;border:none;border-radius:8px;font-size:16px;margin:6px 0;cursor:pointer;}
+.btn-primary{background:#23396b;color:#fff;}
+.btn-warning{background:#e67e22;color:#fff;}
+.btn-gray{background:#999;color:#fff;}
+.info-card{padding:14px;background:#f0f4fb;border-radius:10px;margin:10px 0;font-size:14px;}
+.rank-item{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #eee;}
+.timer-text{font-size:28px;font-weight:bold;color:#23396b;text-align:center;margin:12px 0;}
+.tip{font-size:13px;color:#666;margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="header">
+<h1>阅览室阅览打卡</h1>
+<p id="weekRange"></p>
+</div>
+
+<div class="tabs">
+<div class="tab active" data-tab="user">读者打卡</div>
+<div class="tab" data-tab="admin">管理员入口</div>
+</div>
+
+<div class="panel show" id="panel-user">
+<div class="form-item">
+<label>读者姓名</label>
+<input type="text" id="readerName" placeholder="请输入真实姓名">
+</div>
+<div class="form-item">
+<label>证件号（学号）</label>
+<input type="text" id="readerId" placeholder="请输入学号">
+</div>
+<div class="info-card">
+<div>签到状态：<span id="statusText">未签到</span></div>
+<div class="timer-text" id="liveTimer">00:00:00</div>
+<div>本周累计时长：<span id="weekTotal">0小时0分</span></div>
+<div class="tip">规则：单次不少于30分钟，每周累计≥3小时为有效打卡；阅览室半径40米范围内有效</div>
+</div>
+<button class="btn btn-primary" id="btnCheckIn">签到</button>
+<button class="btn btn-warning" id="btnCheckOut" disabled>签退</button>
+<div class="info-card">
+<h4>本周排行</h4>
+<div id="rankList"></div>
+</div>
+</div>
+
+<div class="panel" id="panel-admin">
+<div class="form-item">
+<label>管理员密码</label>
+<input type="password" id="adminPwd" placeholder="输入管理员密码">
+</div>
+<button class="btn btn-primary" id="btnAdminLogin">登录后台</button>
+<div id="adminArea" style="display:none;margin-top:10px;">
+<div class="info-card">
+<h4>全部打卡记录</h4>
+<div id="allRecord"></div>
+<button class="btn btn-gray" id="btnClear">清空全部测试数据(谨慎)</button>
+</div>
+</div>
+</div>
+
+<script>
+// =========配置区========
+const targetLat = 36.6211;
+const targetLng = 101.7782;
+const radiusMeter = 40;
+const adminPassword = "lib2026";
+const WEEK_START_DAY = 1; //周一为一周起点
+//=======================
+
+//全局捕获异常，防止闪退
+window.onerror = function(msg,url,line){
+alert("运行异常："+msg);
+return true;
+};
+
+//计算本周日期范围
+function getWeekRangeText(){
+let now=new Date();
+let day=now.getDay();
+day = day===0 ?7:day;
+let diffStart = day - WEEK_START_DAY;
+let start=new Date(now.getTime() - diffStart*86400000);
+let end=new Date(start.getTime()+6*86400000);
+const fmt=(d)=>`${d.getMonth()+1}/${d.getDate()}`;
+return `${fmt(start)}-${fmt(end)}`;
+}
+document.getElementById("weekRange").innerText = getWeekRangeText();
+
+//工具：计算两点距离米
+function getDistance(lat1,lng1,lat2,lng2){
+const R=6371000;
+const rad=Math.PI/180;
+let la1=lat1*rad,la2=lat2*rad;
+let dLa=(lat2-lat1)*rad;
+let dLn=(lng2-lng1)*rad;
+let a=Math.sin(dLa/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLn/2)**2;
+return 2*R*Math.asin(Math.sqrt(a));
+}
+
+//本地存储封装
+function getStorage(key){
+try{
+let s=localStorage.getItem(key);
+return s?JSON.parse(s):null;
+}catch(e){return null;}
+}
+function setStorage(key,obj){
+try{localStorage.setItem(key,JSON.stringify(obj));}catch(e){alert("本地存储失败，请清理浏览器缓存");}
+}
+
+//页面切换
+document.querySelectorAll(".tab").forEach(t=>{
+t.onclick=()=>{
+document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+t.classList.add("active");
+let tab=t.dataset.tab;
+document.querySelectorAll(".panel").forEach(p=>p.classList.remove("show"));
+document.getElementById("panel-"+tab).classList.add("show");
+}
+});
+
+let checkInRecord = getStorage("checkInRecord")||[];
+let currentSession = getStorage("currentSession")||null;
+let timer=null;
+
+//刷新视图
+function refreshView(){
+document.getElementById("rankList").innerHTML="";
+let weekText=getWeekRangeText();
+let [sStr,eStr]=weekText.split("-");
+function parseMd(s){
+let[m,d]=s.split("/");return {m:Number(m),d:Number(d)};
+}
+let sMd=parseMd(sStr),eMd=parseMd(eStr);
+
+//筛选本周数据
+function isThisWeek(ts){
+let dt=new Date(ts);
+let m=dt.getMonth()+1,d=dt.getDate();
+let t=dt.getTime();
+let s=new Date(dt.getFullYear(),sMd.m-1,sMd.d).getTime();
+let e=new Date(dt.getFullYear(),eMd.m-1,eMd.d,23,59,59).getTime();
+return t>=s&&t<=e;
+}
+
+//计算每个人本周时长
+let userMap={};
+checkInRecord.forEach(r=>{
+if(!isThisWeek(r.checkInAt)) return;
+if(!r.checkOutAt) return;
+let dur=r.checkOutAt - r.checkInAt;
+if(dur<0) return;
+let key=r.name+"|"+r.id;
+if(!userMap[key]) userMap[key]={name:r.name,id:r.id,ms:0};
+userMap[key].ms+=dur;
+});
+let arr=Object.values(userMap).sort((a,b)=>b.ms-a.ms);
+arr.forEach(u=>{
+let h=Math.floor(u.ms/3600000);
+let mi=Math.floor((u.ms%3600000)/60000);
+let div=document.createElement("div");
+div.className="rank-item";
+div.innerHTML=`<span>${u.name}</span><span>${h}小时${mi}分</span>`;
+document.getElementById("rankList").appendChild(div);
+});
+
+//当前会话
+if(currentSession){
+document.getElementById("statusText").innerText="已签到";
+document.getElementById("btnCheckIn").disabled=true;
+document.getElementById("btnCheckOut").disabled=false;
+startLiveTimer();
+}else{
+document.getElementById("statusText").innerText="未签到";
+document.getElementById("btnCheckIn").disabled=false;
+document.getElementById("btnCheckOut").disabled=true;
+stopLiveTimer();
+document.getElementById("liveTimer").innerText="00:00:00";
+}
+
+//本周本人时长
+let myName=document.getElementById("readerName").value.trim();
+let myId=document.getElementById("readerId").value.trim();
+let myWeekMs=0;
+checkInRecord.forEach(r=>{
+if(r.name===myName&&r.id===myId&&r.checkOutAt&&isThisWeek(r.checkInAt)){
+myWeekMs += r.checkOutAt - r.checkInAt;
+}
+});
+let wh=Math.floor(myWeekMs/3600000);
+let wm=Math.floor((myWeekMs%3600000)/60000);
+document.getElementById("weekTotal").innerText=`${wh}小时${wm}分`;
+renderAdminTable();
+}
+
+function startLiveTimer(){
+stopLiveTimer();
+if(!currentSession) return;
+timer=setInterval(()=>{
+let delta=Date.now()-currentSession.checkInAt;
+let h=Math.floor(delta/3600000);
+let mi=Math.floor((delta%3600000)/60000);
+let sec=Math.floor((delta%60000)/1000);
+document.getElementById("liveTimer").innerText=
+String(h).padStart(2,'0')+":"+String(mi).padStart(2,'0')+":"+String(sec).padStart(2,'0');
+},1000);
+}
+function stopLiveTimer(){
+if(timer){clearInterval(timer);timer=null;}
+}
+
+//签到
+document.getElementById("btnCheckIn").onclick=async function(){
+let name=document.getElementById("readerName").value.trim();
+let sid=document.getElementById("readerId").value.trim();
+if(!name||!sid){alert("请填写姓名和学号");return;}
+let btn=this;
+btn.disabled=true;
+try{
+let pos=await new Promise((resolve,reject)=>{
+if(!navigator.geolocation){reject("浏览器不支持定位");return;}
+navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:8000,maximumAge:0});
+});
+let lat=pos.coords.latitude;
+let lng=pos.coords.longitude;
+let dist=getDistance(lat,lng,targetLat,targetLng);
+if(dist>radiusMeter){
+alert(`不在阅览室范围内，距离：${Math.round(dist)}米，允许最大${radiusMeter}米`);
+btn.disabled=false;
+return;
+}
+currentSession={name:name,id:sid,checkInAt:Date.now(),lat:lat,lng:lng};
+setStorage("currentSession",currentSession);
+alert("签到成功");
+refreshView();
+}catch(err){
+alert("获取定位失败："+(err.message||"请打开位置权限，到阅览室再试"));
+btn.disabled=false;
+}
+};
+
+//签退
+document.getElementById("btnCheckOut").onclick=function(){
+if(!currentSession) return;
+let session=currentSession;
+let checkOutAt=Date.now();
+let dur=checkOutAt-session.checkInAt;
+checkInRecord.push({
+name:session.name,
+id:session.id,
+checkInAt:session.checkInAt,
+checkOutAt:checkOutAt,
+durationMs:dur
+});
+setStorage("checkInRecord",checkInRecord);
+currentSession=null;
+setStorage("currentSession",null);
+alert("签退完成");
+refreshView();
+};
+
+//管理员
+document.getElementById("btnAdminLogin").onclick=function(){
+let pwd=document.getElementById("adminPwd").value.trim();
+if(pwd===adminPassword){
+document.getElementById("adminArea").style.display="block";
+renderAdminTable();
+}else{
+alert("密码错误");
+}
+};
+function renderAdminTable(){
+let box=document.getElementById("allRecord");
+box.innerHTML="";
+if(checkInRecord.length===0){box.innerText="暂无记录";return;}
+checkInRecord.slice().reverse().forEach(r=>{
+let d1=new Date(r.checkInAt).toLocaleString();
+let d2=r.checkOutAt?new Date(r.checkOutAt).toLocaleString():"-";
+let m=Math.floor(r.durationMs/60000);
+let div=document.createElement("div");
+div.style="padding:6px 0;border-bottom:1px solid #eee;font-size:12px;";
+div.innerText=`${r.name}(${r.id})｜签到:${d1}｜签退:${d2}｜时长:${m}分钟`;
+box.appendChild(div);
+});
+}
+document.getElementById("btnClear").onclick=function(){
+if(confirm("确认清空全部打卡数据？不可恢复！")){
+localStorage.removeItem("checkInRecord");
+localStorage.removeItem("currentSession");
+checkInRecord=[];currentSession=null;
+refreshView();
+alert("已清空");
+}
+};
+
+window.onload=function(){
+refreshView();
+};
+</script>
+</body>
+</html>
