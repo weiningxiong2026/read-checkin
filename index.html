@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>阅览室打卡系统</title>
+<style>
+:root{
+  --primary:#2b6cb0;--primary-light:#ebf4ff;--primary-dark:#1a365d;
+  --success:#38a169;--success-light:#f0fff4;--warning:#d69e2e;--danger:#e53e3e;
+  --gray-50:#f7fafc;--gray-100:#edf2f7;--gray-200:#e2e8f0;--gray-300:#cbd5e0;
+  --gray-500:#718096;--gray-700:#4a5568;--gray-900:#1a202c;
+  --radius:16px;--shadow:0 4px 24px rgba(0,0,0,.06);--transition:.3s cubic-bezier(.4,0,.2,1);
+  --font:'PingFang SC','Microsoft YaHei','Helvetica Neue',Arial,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--gray-50);color:var(--gray-900);min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;padding:0 0 72px}
+.app-container{width:100%;max-width:480px;background:#fff;min-height:100vh;display:flex;flex-direction:column;
+  box-shadow:0 0 40px rgba(0,0,0,.06)}
+/* 头部 */
+.app-header{text-align:center;padding:20px 16px 16px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff}
+.app-header .logo{font-size:32px;margin-bottom:6px}
+.app-header h1{font-size:20px;font-weight:700;letter-spacing:.5px}
+.app-header p{font-size:12px;opacity:.8;margin-top:2px}
+/* 内容区 */
+.page-content{flex:1;padding:20px 16px;overflow-y:auto}
+.page{display:none;animation:fadeUp .35s ease}
+.page.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+/* 底部导航 */
+.tab-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
+  background:#fff;border-top:1px solid var(--gray-200);display:flex;z-index:100;
+  box-shadow:0 -2px 12px rgba(0,0,0,.04)}
+.tab-item{flex:1;text-align:center;padding:10px 0 8px;cursor:pointer;transition:var(--transition);color:var(--gray-500)}
+.tab-item .icon{font-size:22px;display:block;margin-bottom:2px}
+.tab-item .label{font-size:11px;font-weight:600}
+.tab-item.active{color:var(--primary)}
+.tab-item.active .icon{transform:scale(1.1)}
+/* 表单 */
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:14px;font-weight:600;color:var(--gray-700);margin-bottom:6px}
+.form-group label .required{color:var(--danger);margin-left:2px}
+.form-group input,.form-group textarea{width:100%;padding:12px 14px;font-size:15px;border:2px solid var(--gray-200);
+  border-radius:12px;outline:none;transition:var(--transition);background:var(--gray-50);font-family:var(--font)}
+.form-group input:focus,.form-group textarea:focus{border-color:var(--primary);background:#fff;box-shadow:0 0 0 4px rgba(43,108,176,.1)}
+.form-group input::placeholder{color:var(--gray-300)}
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;width:100%;padding:14px 20px;font-size:16px;
+  font-weight:600;border:none;border-radius:12px;cursor:pointer;transition:var(--transition);font-family:var(--font);position:relative}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--primary-dark)}
+.btn-success{background:var(--success);color:#fff}
+.btn-success:hover:not(:disabled){background:#2f855a}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-outline{background:transparent;color:var(--gray-500);border:2px solid var(--gray-200)}
+.btn-outline:hover{border-color:var(--gray-300);background:var(--gray-50)}
+.btn-sm{padding:8px 14px;font-size:13px;width:auto;border-radius:8px}
+/* 用户卡片 */
+.user-card{background:var(--primary-light);border-radius:14px;padding:14px 16px;margin-bottom:18px;
+  display:flex;align-items:center;gap:12px;border:1px solid rgba(43,108,176,.1)}
+.user-card .avatar{width:44px;height:44px;border-radius:50%;background:var(--primary);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0}
+.user-card .info{flex:1;min-width:0}
+.user-card .info .name{font-size:16px;font-weight:700;color:var(--primary-dark)}
+.user-card .info .detail{font-size:12px;color:var(--gray-500);margin-top:2px}
+.user-card .switch-btn{background:none;border:none;color:var(--gray-500);font-size:12px;cursor:pointer;padding:6px 8px;border-radius:8px}
+.user-card .switch-btn:hover{background:rgba(0,0,0,.04);color:var(--danger)}
+/* 打卡状态 */
+.checkin-status{text-align:center;padding:12px 0}
+.status-badge{display:inline-block;padding:6px 20px;border-radius:40px;font-size:14px;font-weight:600}
+.status-badge.checked-in{background:var(--success-light);color:var(--success);border:1px solid #c6f6d5}
+.status-badge.not-checked{background:var(--gray-100);color:var(--gray-500);border:1px solid var(--gray-200)}
+/* 计时器 */
+.timer-box{text-align:center;margin:16px 0;padding:20px;background:var(--gray-50);border-radius:14px;border:1px solid var(--gray-100)}
+.timer-box .timer-label{font-size:13px;color:var(--gray-500);margin-bottom:6px}
+.timer-box .timer-value{font-size:36px;font-weight:700;color:var(--primary-dark);font-variant-numeric:tabular-nums;letter-spacing:2px}
+.timer-box .timer-hint{font-size:12px;color:var(--gray-500);margin-top:6px}
+/* GPS状态 */
+.gps-status{display:flex;align-items:center;gap:8px;font-size:13px;padding:10px 14px;border-radius:10px;margin-bottom:14px}
+.gps-status.checking{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+.gps-status.inside{background:var(--success-light);color:#276749;border:1px solid #c6f6d5}
+.gps-status.outside{background:#fff5f5;color:#c53030;border:1px solid #fed7d7}
+.gps-status.error{background:#fff5f5;color:#c53030;border:1px solid #fed7d7}
+.gps-status .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.gps-status.checking .dot{background:#d69e2e;animation:pulse 1.5s infinite}
+.gps-status.inside .dot{background:var(--success)}
+.gps-status.outside .dot,.gps-status.error .dot{background:var(--danger)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+/* 打卡按钮区 */
+.checkin-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+/* 记录列表 */
+.section-title{font-size:15px;font-weight:700;color:var(--gray-700);margin:20px 0 10px;
+  display:flex;align-items:center;justify-content:space-between}
+.section-title span{font-size:12px;font-weight:400;color:var(--gray-500)}
+.record-list{border-radius:12px;border:1px solid var(--gray-100);background:var(--gray-50);overflow:hidden}
+.record-item{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;
+  border-bottom:1px solid var(--gray-100);font-size:13px}
+.record-item:last-child{border-bottom:none}
+.record-item .date{color:var(--gray-700);font-weight:500}
+.record-item .time{color:var(--gray-500);font-size:12px}
+.record-item .tag{padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.tag-in{background:var(--success-light);color:var(--success)}
+.tag-out{background:#fff5f5;color:var(--danger)}
+.tag-auto{background:#fef3c7;color:#92400e}
+.record-empty{text-align:center;padding:28px 16px;color:var(--gray-500);font-size:13px}
+.record-empty .icon{font-size:28px;margin-bottom:6px;opacity:.4}
+/* 统计卡片 */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.stat-card{background:var(--gray-50);border-radius:12px;padding:14px;text-align:center;border:1px solid var(--gray-100)}
+.stat-card .stat-value{font-size:24px;font-weight:700;color:var(--primary-dark)}
+.stat-card .stat-label{font-size:12px;color:var(--gray-500);margin-top:4px}
+.stat-card.highlight{background:var(--primary-light);border-color:rgba(43,108,176,.15)}
+.stat-card.highlight .stat-value{color:var(--primary)}
+/* 有效性状态 */
+.validity-box{padding:14px 16px;border-radius:12px;margin-bottom:16px;font-size:13px;line-height:1.7}
+.validity-box.valid{background:var(--success-light);color:#276749;border:1px solid #c6f6d5}
+.validity-box.invalid{background:#fff5f5;color:#c53030;border:1px solid #fed7d7}
+.validity-box .v-title{font-weight:700;font-size:14px;margin-bottom:4px}
+.validity-box .v-bar{height:8px;background:rgba(0,0,0,.08);border-radius:4px;margin:8px 0;overflow:hidden}
+.validity-box .v-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.validity-box.valid .v-bar-fill{background:var(--success)}
+.validity-box.invalid .v-bar-fill{background:var(--warning)}
+/* 管理员登录 */
+.admin-login{max-width:360px;margin:40px auto 0;text-align:center}
+.admin-login .lock-icon{font-size:48px;margin-bottom:16px}
+.admin-login h2{font-size:18px;color:var(--gray-700);margin-bottom:8px}
+.admin-login p{font-size:13px;color:var(--gray-500);margin-bottom:24px}
+/* 管理员面板 */
+.admin-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.admin-header h2{font-size:17px;font-weight:700;color:var(--gray-900)}
+.admin-section{margin-bottom:20px}
+.admin-section h3{font-size:14px;font-weight:700;color:var(--gray-700);margin-bottom:10px;
+  padding-bottom:8px;border-bottom:1px solid var(--gray-100)}
+/* 二维码 */
+.qr-box{text-align:center;padding:16px;background:var(--gray-50);border-radius:12px;border:1px solid var(--gray-100)}
+.qr-box canvas,.qr-box img{display:inline-block;border-radius:8px;background:#fff}
+.qr-box .qr-url{margin-top:10px;font-size:11px;color:var(--gray-500);word-break:break-all;
+  background:#fff;padding:6px 10px;border-radius:8px;border:1px solid var(--gray-100);user-select:text}
+.qr-actions{display:flex;gap:8px;margin-top:10px}
+/* 排名列表 */
+.rank-list{border-radius:12px;border:1px solid var(--gray-100);overflow:hidden}
+.rank-item{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--gray-100);
+  background:#fff;cursor:pointer;transition:var(--transition)}
+.rank-item:last-child{border-bottom:none}
+.rank-item:hover{background:var(--gray-50)}
+.rank-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;flex-shrink:0}
+.rank-num.top1{background:#fef3c7;color:#92400e}
+.rank-num.top2{background:#e2e8f0;color:#4a5568}
+.rank-num.top3{background:#fde8e8;color:#c53030}
+.rank-num.normal{background:var(--gray-100);color:var(--gray-500)}
+.rank-info{flex:1;min-width:0}
+.rank-info .r-name{font-size:14px;font-weight:600;color:var(--gray-900)}
+.rank-info .r-detail{font-size:11px;color:var(--gray-500);margin-top:1px}
+.rank-time{text-align:right;flex-shrink:0}
+.rank-time .r-val{font-size:15px;font-weight:700;color:var(--primary-dark)}
+.rank-time .r-unit{font-size:10px;color:var(--gray-500)}
+.rank-badge{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;margin-top:2px}
+.rank-badge.pass{background:var(--success-light);color:var(--success)}
+.rank-badge.fail{background:#fff5f5;color:var(--danger)}
+/* 详情弹窗 */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;
+  display:none;align-items:flex-end;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;width:100%;max-width:480px;max-height:80vh;border-radius:20px 20px 0 0;
+  padding:20px 16px 24px;overflow-y:auto;animation:slideUp .3s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.modal-header h3{font-size:16px;font-weight:700}
+.modal-close{background:none;border:none;font-size:20px;color:var(--gray-500);cursor:pointer;padding:4px 8px}
+/* Toast */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);background:var(--gray-900);
+  color:#fff;padding:12px 22px;border-radius:12px;font-size:14px;font-weight:500;z-index:999;
+  transition:transform .4s cubic-bezier(.4,0,.2,1);pointer-events:none;max-width:90%;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.success{background:var(--success)}.toast.error{background:var(--danger)}.toast.info{background:var(--primary)}.toast.warning{background:var(--warning)}
+/* 工具类 */
+.hidden{display:none!important}
+.mt-8{margin-top:8px}.mt-12{margin-top:12px}.mt-16{margin-top:16px}
+.text-center{text-align:center}
+.text-sm{font-size:12px;color:var(--gray-500)}
+.flex-gap{display:flex;gap:8px}
+/* 导入导出 */
+.io-box{background:var(--gray-50);border-radius:12px;padding:14px;border:1px solid var(--gray-100)}
+.io-box textarea{width:100%;min-height:80px;padding:10px;font-size:12px;border:1px solid var(--gray-200);
+  border-radius:8px;resize:vertical;font-family:monospace;background:#fff}
+.week-selector{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:14px}
+.week-selector button{background:var(--gray-100);border:none;width:32px;height:32px;border-radius:8px;
+  font-size:16px;cursor:pointer;color:var(--gray-700);display:flex;align-items:center;justify-content:center}
+.week-selector button:hover{background:var(--gray-200)}
+.week-selector .week-label{font-size:14px;font-weight:600;color:var(--gray-700);min-width:120px;text-align:center}
+</style>
+</head>
+<body>
+
+<div id="toast" class="toast"></div>
+
+<div class="app-container">
+  <div class="app-header">
+    <div class="logo">📖</div>
+    <h1>阅览室打卡系统</h1>
+    <p>注册一次 · 定位签到 · 自动统计</p>
+  </div>
+
+  <div class="page-content">
+    <!-- ===== 打卡页 ===== -->
+    <div class="page active" id="page-checkin">
+      <!-- 未注册 -->
+      <div id="registerView">
+        <div class="text-center" style="margin-bottom:20px">
+          <div style="font-size:40px;margin-bottom:8px">✍️</div>
+          <h2 style="font-size:18px;color:var(--gray-900);margin-bottom:4px">读者注册</h2>
+          <p style="font-size:13px;color:var(--gray-500)">填写信息后即可开始打卡</p>
+        </div>
+        <form id="registerForm" autocomplete="off">
+          <div class="form-group">
+            <label>真实姓名 <span class="required">*</span></label>
+            <input type="text" id="regName" placeholder="请输入真实姓名" required maxlength="20">
+          </div>
+          <div class="form-group">
+            <label>班级 / 部门 <span class="required">*</span></label>
+            <input type="text" id="regDept" placeholder="例：计算机2101班 / 技术部" required maxlength="40">
+          </div>
+          <div class="form-group">
+            <label>学号 / 工号 <span class="required">*</span></label>
+            <input type="text" id="regSid" placeholder="请输入学号或工号" required maxlength="30">
+          </div>
+          <button type="submit" class="btn btn-primary">完成注册，进入打卡</button>
+          <p class="text-sm text-center mt-12">信息仅保存在本设备，用于打卡身份识别</p>
+        </form>
+      </div>
+
+      <!-- 已注册-打卡 -->
+      <div id="checkinView" class="hidden">
+        <div class="user-card">
+          <div class="avatar" id="ckAvatar">—</div>
+          <div class="info">
+            <div class="name" id="ckName">——</div>
+            <div class="detail" id="ckDetail">——</div>
+          </div>
+          <button class="switch-btn" id="switchBtn">⟳ 切换</button>
+        </div>
+
+        <div class="gps-status checking" id="gpsStatus">
+          <div class="dot"></div>
+          <span id="gpsText">正在获取定位…</span>
+        </div>
+
+        <div class="checkin-status">
+          <span class="status-badge not-checked" id="ckStatusBadge">未打卡</span>
+        </div>
+
+        <div class="timer-box hidden" id="timerBox">
+          <div class="timer-label">已打卡时长</div>
+          <div class="timer-value" id="timerValue">00:00:00</div>
+          <div class="timer-hint" id="timerHint">单次满30分钟计为有效打卡</div>
+        </div>
+
+        <div class="checkin-actions">
+          <button class="btn btn-success" id="checkinBtn">✅ 签到</button>
+          <button class="btn btn-danger" id="checkoutBtn" disabled>🚪 签退</button>
+        </div>
+
+        <div class="section-title">今日打卡记录 <span id="todayCount">0 条</span></div>
+        <div class="record-list" id="todayRecords">
+          <div class="record-empty"><div class="icon">📋</div>暂无记录</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 我的页 ===== -->
+    <div class="page" id="page-mine">
+      <div id="mineNoUser" class="text-center" style="padding:60px 20px">
+        <div style="font-size:48px;margin-bottom:12px">👤</div>
+        <p style="color:var(--gray-500);font-size:14px">请先在「打卡」页完成注册</p>
+      </div>
+      <div id="mineContent" class="hidden">
+        <div class="user-card">
+          <div class="avatar" id="mineAvatar">—</div>
+          <div class="info">
+            <div class="name" id="mineName">——</div>
+            <div class="detail" id="mineDetail">——</div>
+          </div>
+        </div>
+
+        <div class="week-selector">
+          <button id="weekPrev">‹</button>
+          <div class="week-label" id="weekLabel">本周</div>
+          <button id="weekNext">›</button>
+        </div>
+
+        <div class="validity-box" id="validityBox">
+          <div class="v-title" id="vTitle">—</div>
+          <div class="v-bar"><div class="v-bar-fill" id="vBarFill" style="width:0%"></div></div>
+          <div id="vDetail">—</div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card highlight">
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-label">本周累计(分钟)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statValid">0</div>
+            <div class="stat-label">有效打卡次数</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statSessions">0</div>
+            <div class="stat-label">打卡场次</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statAvg">0</div>
+            <div class="stat-label">场均时长(分钟)</div>
+          </div>
+        </div>
+
+        <div class="section-title">本周打卡明细</div>
+        <div class="record-list" id="weekRecords">
+          <div class="record-empty"><div class="icon">📋</div>本周暂无打卡记录</div>
+        </div>
+
+        <div class="admin-section mt-16">
+          <h3>数据导出</h3>
+          <div class="io-box">
+            <p class="text-sm" style="margin-bottom:8px">导出您的打卡数据，交管理员导入审核</p>
+            <textarea id="exportData" readonly placeholder="点击下方按钮生成导出数据"></textarea>
+            <div class="flex-gap mt-8">
+              <button class="btn btn-outline btn-sm" id="genExportBtn">生成导出数据</button>
+              <button class="btn btn-outline btn-sm" id="copyExportBtn">复制</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 管理页 ===== -->
+    <div class="page" id="page-admin">
+      <!-- 登录 -->
+      <div id="adminLoginView">
+        <div class="admin-login">
+          <div class="lock-icon">🔒</div>
+          <h2>管理员登录</h2>
+          <p>请输入管理员密码以进入管理后台</p>
+          <form id="adminLoginForm">
+            <div class="form-group">
+              <input type="password" id="adminPwd" placeholder="请输入管理员密码" required>
+            </div>
+            <button type="submit" class="btn btn-primary">登 录</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- 管理面板 -->
+      <div id="adminPanelView" class="hidden">
+        <div class="admin-header">
+          <h2>🛠 管理后台</h2>
+          <button class="btn btn-outline btn-sm" id="adminLogoutBtn">退出</button>
+        </div>
+
+        <div class="week-selector">
+          <button id="adminWeekPrev">‹</button>
+          <div class="week-label" id="adminWeekLabel">本周</div>
+          <button id="adminWeekNext">›</button>
+        </div>
+
+        <!-- 二维码 -->
+        <div class="admin-section">
+          <h3>📱 读者打卡二维码（长期有效）</h3>
+          <div class="qr-box">
+            <div id="qrcodeCanvas"></div>
+            <div class="qr-url" id="qrUrl">—</div>
+            <div class="qr-actions">
+              <button class="btn btn-outline btn-sm" id="downloadQrBtn">下载二维码</button>
+            </div>
+            <p class="text-sm mt-8">将二维码打印张贴于阅览室入口，读者扫码即可注册/打卡</p>
+          </div>
+        </div>
+
+        <!-- 有效性规则说明 -->
+        <div class="admin-section">
+          <h3>📋 有效性规则</h3>
+          <div class="io-box" style="font-size:13px;line-height:1.8;color:var(--gray-700)">
+            <div>✅ 单次有效：连续打卡时长 ≥ <strong>30分钟</strong></div>
+            <div>✅ 周累计有效：本周有效场次累计 ≥ <strong>180分钟</strong></div>
+            <div>⚠️ 超出阅览室40米范围将自动签退</div>
+            <div>📅 每自然周（周一至周日）自动统计排名</div>
+          </div>
+        </div>
+
+        <!-- 排名 -->
+        <div class="admin-section">
+          <h3>🏆 有效打卡排名 <span id="rankCount" class="text-sm"></span></h3>
+          <div class="rank-list" id="rankList">
+            <div class="record-empty"><div class="icon">📊</div>暂无打卡数据<br>请读者完成打卡后查看</div>
+          </div>
+        </div>
+
+        <!-- 数据导入 -->
+        <div class="admin-section">
+          <h3>📥 数据导入</h3>
+          <div class="io-box">
+            <p class="text-sm" style="margin-bottom:8px">粘贴读者导出的JSON数据，导入后参与排名统计</p>
+            <textarea id="importData" placeholder="在此粘贴读者导出的JSON数据…"></textarea>
+            <div class="flex-gap mt-8">
+              <button class="btn btn-primary btn-sm" id="importBtn">导入数据</button>
+              <button class="btn btn-outline btn-sm" id="clearDataBtn">清空所有数据</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 密码工具 -->
+        <div class="admin-section">
+          <h3>🔑 密码管理</h3>
+          <div class="io-box">
+            <p class="text-sm" style="margin-bottom:8px">生成新密码的SHA-256哈希，替换代码中 ADMIN_PASSWORD_HASH 即可修改密码</p>
+            <div class="flex-gap" style="margin-bottom:8px">
+              <input type="password" id="newPwdInput" placeholder="输入新密码" style="flex:1;padding:8px 12px;font-size:13px;border:1px solid var(--gray-200);border-radius:8px">
+              <button class="btn btn-outline btn-sm" id="genHashBtn">生成哈希</button>
+            </div>
+            <textarea id="hashResult" readonly placeholder="哈希结果将显示在这里"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部Tab -->
+  <div class="tab-bar">
+    <div class="tab-item active" data-page="checkin">
+      <span class="icon">✅</span><span class="label">打卡</span>
+    </div>
+    <div class="tab-item" data-page="mine">
+      <span class="icon">📊</span><span class="label">我的</span>
+    </div>
+    <div class="tab-item" data-page="admin">
+      <span class="icon">🔧</span><span class="label">管理</span>
+    </div>
+  </div>
+</div>
+
+<!-- 读者详情弹窗 -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="detailTitle">读者详情</h3>
+      <button class="modal-close" id="detailClose">✕</button>
+    </div>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+// ================================================================
+//  配置区（图书馆网络工程师可按需修改）
+// ================================================================
+const CONFIG = {
+  // 管理员密码的SHA-256哈希（默认密码：Lib2026!Read）
+  // 修改密码：用管理后台的"密码管理"工具生成新哈希，替换此处
+  ADMIN_PASSWORD_HASH: '3d4b37bef3db9b1408b3362d87af9676f69ae3f41f2bfd9361c2d4c69ff3192d',
+  // 阅览室坐标（北纬36°36′2″, 东经101°45′25″）
+  TARGET_LAT: 36 + 36/60 + 2/3600,   // ≈36.60056
+  TARGET_LNG: 101 + 45/60 + 25/3600, // ≈101.75694
+  // 允许打卡范围（米）
+  ALLOWED_RADIUS: 40,
+  // 单次有效打卡最短时长（秒）= 30分钟
+  MIN_SESSION_SECONDS: 30 * 60,
+  // 每周累计有效时长（秒）= 180分钟
+  WEEKLY_REQUIRED_SECONDS: 180 * 60,
+  // GPS定位超时（毫秒）
+  GPS_TIMEOUT: 15000,
+  // GPS最大缓存年龄（毫秒）
+  GPS_MAX_AGE: 5000,
+};
+
+// ================================================================
+//  工具函数
+// ================================================================
+const $ = id => document.getElementById(id);
+
+function showToast(msg, type='info', duration=2600){
+  const el=$('toast');el.textContent=msg;el.className='toast '+type;
+  void el.offsetWidth;el.classList.add('show');
+  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),duration);
+}
+
+function pad(n){return String(n).padStart(2,'0')}
+function getTodayStr(d=new Date()){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function getTimeStr(d=new Date()){return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())}
+function fmtDuration(sec){
+  sec=Math.max(0,Math.floor(sec));
+  const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;
+  return pad(h)+':'+pad(m)+':'+pad(s);
+}
+function fmtMinutes(sec){return (sec/60).toFixed(1)}
+
+// SHA-256
+async function sha256(msg){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// localStorage 安全读写
+function sGet(k,def=null){try{const v=localStorage.getItem(k);return v!==null?JSON.parse(v):def}catch{return def}}
+function sSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch{return false}}
+function sRemove(k){try{localStorage.removeItem(k);return true}catch{return false}}
+
+// ================================================================
+//  周计算（ISO周，周一为一周开始）
+// ================================================================
+function getWeekKey(d=new Date()){
+  const date=new Date(d);date.setHours(0,0,0,0);
+  date.setDate(date.getDate()+3-(date.getDay()+6)%7);
+  const w1=new Date(date.getFullYear(),0,4);
+  const wn=1+Math.round(((date-w1)/86400000-3+(w1.getDay()+6)%7)/7);
+  return date.getFullYear()+'-W'+pad(wn);
+}
+function getWeekStart(d=new Date()){
+  const date=new Date(d);date.setHours(0,0,0,0);
+  const day=date.getDay();
+  date.setDate(date.getDate()-day+(day===0?-6:1));
+  return date;
+}
+function getWeekEnd(d=new Date()){
+  const s=getWeekStart(d);const e=new Date(s);e.setDate(s.getDate()+6);e.setHours(23,59,59,999);return e;
+}
+function getWeekLabel(d=new Date()){
+  const s=getWeekStart(d),e=getWeekEnd(d);
+  const now=new Date();
+  const isCurrent=getWeekKey(now)===getWeekKey(d);
+  const prefix=isCurrent?'本周 · ':'';
+  return prefix+(s.getMonth()+1)+'/'+s.getDate()+' - '+(e.getMonth()+1)+'/'+e.getDate();
+}
+function shiftWeek(d,delta){
+  const nd=new Date(d);nd.setDate(nd.getDate()+delta*7);return nd;
+}
+
+// ================================================================
+//  Haversine 距离计算（米）
+// ================================================================
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371000;
+  const dLat=(lat2-lat1)*Math.PI/180;
+  const dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// ================================================================
+//  数据层
+// ================================================================
+const K_USER='rc_user';
+const K_RECORDS='rc_records';
+const K_READERS='rc_readers';
+const K_ADMIN='rc_admin_session';
+
+function getUser(){return sGet(K_USER,null)}
+function saveUser(u){
+  sSet(K_USER,u);
+  // 同时写入读者注册表（供管理员查看）
+  const readers=sGet(K_READERS,{});
+  readers[u.readerId]=u;
+  sSet(K_READERS,readers);
+}
+function clearUser(){sRemove(K_USER)}
+function getReaders(){return sGet(K_READERS,{})}
+function getRecords(){return sGet(K_RECORDS,[])}
+function saveRecords(r){sSet(K_RECORDS,r)}
+function addRecord(rec){
+  const all=getRecords();
+  rec.id=Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  all.push(rec);saveRecords(all);return rec;
+}
+
+// 生成读者ID
+function genReaderId(){return 'r_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6)}
+
+// ================================================================
+//  打卡场次计算（配对签到/签退）
+// ================================================================
+function getSessions(readerId,weekKey){
+  const all=getRecords();
+  const list=all.filter(r=>r.readerId===readerId&&r.weekKey===weekKey)
+    .sort((a,b)=>a.timestamp-b.timestamp);
+  const sessions=[];let cin=null;
+  for(const r of list){
+    if(r.type==='in'){cin=r}
+    else if(r.type==='out'&&cin){
+      const dur=r.timestamp-cin.timestamp;
+      sessions.push({
+        checkin:cin,checkout:r,duration:dur,
+        valid:dur>=CONFIG.MIN_SESSION_SECONDS,
+        autoCheckout:!!r.autoCheckout
+      });cin=null;
+    }
+  }
+  return sessions;
+}
+
+// 获取读者周统计
+function getReaderWeekStats(readerId,weekKey){
+  const sessions=getSessions(readerId,weekKey);
+  const validSessions=sessions.filter(s=>s.valid);
+  const totalSec=sessions.reduce((a,s)=>a+s.duration,0);
+  const validSec=validSessions.reduce((a,s)=>a+s.duration,0);
+  return {
+    sessions,totalSec,validSec,
+    validCount:validSessions.length,
+    sessionCount:sessions.length,
+    avgSec:sessions.length?totalSec/sessions.length:0,
+    passed:validSec>=CONFIG.WEEKLY_REQUIRED_SECONDS
+  };
+}
+
+// ================================================================
+//  GPS 定位管理
+// ================================================================
+const GPS={
+  current:null,      // {lat,lng,accuracy,timestamp}
+  watchId:null,
+  watching:false,
+  init(){
+    this.update();
+    // 持续监控（签到后用于超范围自动签退）
+    if(navigator.geolocation){
+      this.watchId=navigator.geolocation.watchPosition(
+        pos=>{
+          this.current={lat:pos.coords.latitude,lng:pos.coords.longitude,
+            accuracy:pos.coords.accuracy,timestamp:Date.now()};
+          this.updateUI();
+          // 如果正在打卡且超出范围，自动签退
+          if(State.checkingIn&&!this.isInside()){
+            autoCheckout('超出阅览室范围，自动签退');
+          }
+        },
+        err=>{this.current=null;this.updateUI(err)},
+        {enableHighAccuracy:true,timeout:CONFIG.GPS_TIMEOUT,maximumAge:CONFIG.GPS_MAX_AGE}
+      );
+    }
+  },
+  update(){
+    if(!navigator.geolocation){this.updateUI({code:-1,message:'设备不支持定位'});return}
+    navigator.geolocation.getCurrentPosition(
+      pos=>{this.current={lat:pos.coords.latitude,lng:pos.coords.longitude,
+        accuracy:pos.coords.accuracy,timestamp:Date.now()};this.updateUI()},
+      err=>{this.current=null;this.updateUI(err)},
+      {enableHighAccuracy:true,timeout:CONFIG.GPS_TIMEOUT,maximumAge:CONFIG.GPS_MAX_AGE}
+    );
+  },
+  distance(){
+    if(!this.current)return null;
+    return haversine(this.current.lat,this.current.lng,CONFIG.TARGET_LAT,CONFIG.TARGET_LNG);
+  },
+  isInside(){
+    const d=this.distance();
+    return d!==null&&d<=CONFIG.ALLOWED_RADIUS;
+  },
+  updateUI(err){
+    const el=$('gpsStatus');if(!el)return;
+    const text=$('gpsText');
+    if(err){
+      el.className='gps-status error';
+      let msg='定位失败，请检查定位权限';
+      if(err.code===1)msg='定位权限被拒绝，请在浏览器设置中允许定位';
+      else if(err.code===2)msg='无法获取位置信息，请检查GPS';
+      else if(err.code===3)msg='定位超时，请重试';
+      text.textContent=msg;
+    }else if(!this.current){
+      el.className='gps-status checking';text.textContent='正在获取定位…';
+    }else{
+      const d=this.distance();
+      if(this.isInside()){
+        el.className='gps-status inside';
+        text.textContent='📍 已在阅览室内（距中心 '+d.toFixed(0)+' 米）';
+      }else{
+        el.className='gps-status outside';
+        text.textContent='⚠️ 不在阅览室范围（距中心 '+d.toFixed(0)+' 米，需≤'+CONFIG.ALLOWED_RADIUS+'米）';
+      }
+    }
+  }
+};
+
+// ================================================================
+//  应用状态
+// ================================================================
+const State={
+  currentPage:'checkin',
+  checkingIn:false,
+  checkinTimestamp:null,
+  timerInterval:null,
+  mineWeekOffset:0,
+  adminWeekOffset:0,
+};
+
+// 恢复进行中的打卡（页面刷新后）
+function restoreCheckin(){
+  const user=getUser();if(!user)return;
+  const today=getTodayStr();
+  const all=getRecords();
+  const todayRecs=all.filter(r=>r.readerId===user.readerId&&r.date===today)
+    .sort((a,b)=>a.timestamp-b.timestamp);
+  let lastIn=null;
+  for(const r of todayRecs){
+    if(r.type==='in')lastIn=r;
+    else if(r.type==='out')lastIn=null;
+  }
+  if(lastIn){
+    State.checkingIn=true;
+    State.checkinTimestamp=lastIn.timestamp;
+    startTimer();
+  }
+}
+
+// ================================================================
+//  计时器
+// ================================================================
+function startTimer(){
+  stopTimer();
+  State.timerInterval=setInterval(updateTimer,1000);
+  updateTimer();
+}
+function stopTimer(){if(State.timerInterval){clearInterval(State.timerInterval);State.timerInterval=null}}
+function updateTimer(){
+  if(!State.checkingIn||!State.checkinTimestamp)return;
+  const elapsed=Date.now()-State.checkinTimestamp;
+  const val=$('timerValue');if(val)val.textContent=fmtDuration(elapsed/1000);
+  const hint=$('timerHint');
+  if(hint){
+    const remain=CONFIG.MIN_SESSION_SECONDS-elapsed/1000;
+    if(remain>0)hint.textContent='距有效打卡还需 '+fmtDuration(remain);
+    else hint.textContent='✅ 已达到有效打卡时长（30分钟）';
+  }
+}
+
+// ================================================================
+//  打卡逻辑
+// ================================================================
+function doCheckin(){
+  const user=getUser();if(!user){showToast('请先注册','error');return}
+  if(State.checkingIn){showToast('已在打卡中，请先签退','info');return}
+  if(!GPS.current){showToast('正在获取定位，请稍候…','warning');GPS.update();return}
+  if(!GPS.isInside()){
+    const d=GPS.distance();
+    showToast('不在阅览室范围（距中心'+(d?d.toFixed(0):'?')+'米），无法签到','error');
+    return;
+  }
+  const now=new Date();
+  addRecord({
+    readerId:user.readerId,
+    type:'in',
+    timestamp:now.getTime(),
+    date:getTodayStr(now),
+    time:getTimeStr(now),
+    weekKey:getWeekKey(now),
+    lat:GPS.current.lat,lng:GPS.current.lng,
+    distance:GPS.distance()
+  });
+  State.checkingIn=true;
+  State.checkinTimestamp=now.getTime();
+  startTimer();
+  showToast('✅ 签到成功！'+getTimeStr(now),'success');
+  renderCheckinPage();
+}
+
+function doCheckout(auto=false,reason=''){
+  const user=getUser();if(!user)return;
+  if(!State.checkingIn){if(!auto)showToast('未在打卡中','info');return}
+  const now=new Date();
+  addRecord({
+    readerId:user.readerId,
+    type:'out',
+    timestamp:now.getTime(),
+    date:getTodayStr(now),
+    time:getTimeStr(now),
+    weekKey:getWeekKey(now),
+    lat:GPS.current?GPS.current.lat:null,
+    lng:GPS.current?GPS.current.lng:null,
+    distance:GPS.distance(),
+    autoCheckout:auto,
+    autoReason:reason
+  });
+  const duration=now.getTime()-State.checkinTimestamp;
+  State.checkingIn=false;State.checkinTimestamp=null;stopTimer();
+  if(auto){
+    showToast('⚠️ '+reason,'warning',4000);
+  }else{
+    const mins=Math.floor(duration/60000);
+    const valid=duration>=CONFIG.MIN_SESSION_SECONDS*1000;
+    showToast((valid?'✅':'⚠️')+' 签退成功！本次'+mins+'分钟'+(valid?'（有效）':'（不足30分钟，不计有效）'),valid?'success':'warning',3500);
+  }
+  renderCheckinPage();
+}
+
+function autoCheckout(reason){doCheckout(true,reason)}
+
+// ================================================================
+//  渲染：打卡页
+// ================================================================
+function renderCheckinPage(){
+  const user=getUser();
+  if(!user){
+    $('registerView').classList.remove('hidden');
+    $('checkinView').classList.add('hidden');
+    return;
+  }
+  $('registerView').classList.add('hidden');
+  $('checkinView').classList.remove('hidden');
+  $('ckAvatar').textContent=user.realName.charAt(0);
+  $('ckName').textContent=user.realName;
+  $('ckDetail').textContent=user.department+' · '+user.studentId;
+
+  // 状态
+  const badge=$('ckStatusBadge');
+  const cinBtn=$('checkinBtn'),coutBtn=$('checkoutBtn');
+  const timerBox=$('timerBox');
+  if(State.checkingIn){
+    badge.textContent='📌 打卡中';badge.className='status-badge checked-in';
+    cinBtn.disabled=true;coutBtn.disabled=false;
+    timerBox.classList.remove('hidden');
+  }else{
+    badge.textContent='⏳ 未打卡';badge.className='status-badge not-checked';
+    cinBtn.disabled=false;coutBtn.disabled=true;
+    timerBox.classList.add('hidden');
+  }
+
+  // 今日记录
+  const today=getTodayStr();
+  const list=getRecords().filter(r=>r.readerId===user.readerId&&r.date===today)
+    .sort((a,b)=>b.timestamp-a.timestamp);
+  $('todayCount').textContent=list.length+' 条';
+  const container=$('todayRecords');
+  if(list.length===0){
+    container.innerHTML='<div class="record-empty"><div class="icon">📋</div>暂无记录</div>';
+  }else{
+    container.innerHTML=list.map(r=>{
+      const tag=r.type==='in'?'<span class="tag tag-in">签到</span>':
+        (r.autoCheckout?'<span class="tag tag-auto">自动签退</span>':'<span class="tag tag-out">签退</span>');
+      return '<div class="record-item"><span class="date">'+r.date+'</span><span class="time">'+r.time+'</span>'+tag+'</div>';
+    }).join('');
+  }
+}
+
+// ================================================================
+//  渲染：我的页
+// ================================================================
+function renderMinePage(){
+  const user=getUser();
+  if(!user){
+    $('mineNoUser').classList.remove('hidden');
+    $('mineContent').classList.add('hidden');
+    return;
+  }
+  $('mineNoUser').classList.add('hidden');
+  $('mineContent').classList.remove('hidden');
+  $('mineAvatar').textContent=user.realName.charAt(0);
+  $('mineName').textContent=user.realName;
+  $('mineDetail').textContent=user.department+' · '+user.studentId;
+
+  const refDate=shiftWeek(new Date(),State.mineWeekOffset);
+  const wk=getWeekKey(refDate);
+  $('weekLabel').textContent=getWeekLabel(refDate);
+
+  const stats=getReaderWeekStats(user.readerId,wk);
+
+  // 有效性
+  const vbox=$('validityBox');
+  const pct=Math.min(100,(stats.validSec/CONFIG.WEEKLY_REQUIRED_SECONDS)*100);
+  if(stats.passed){
+    vbox.className='validity-box valid';
+    $('vTitle').textContent='✅ 本周已达标';
+    $('vBarFill').style.width='100%';
+    $('vDetail').textContent='有效累计 '+fmtMinutes(stats.validSec)+' 分钟（要求≥180分钟），有效打卡 '+stats.validCount+' 次';
+  }else{
+    vbox.className='validity-box invalid';
+    $('vTitle').textContent='⏳ 本周未达标';
+    $('vBarFill').style.width=pct+'%';
+    const need=Math.ceil((CONFIG.WEEKLY_REQUIRED_SECONDS-stats.validSec)/60);
+    $('vDetail').textContent='有效累计 '+fmtMinutes(stats.validSec)+'/180 分钟，还差 '+need+' 分钟；有效打卡 '+stats.validCount+' 次（单次需≥30分钟）';
+  }
+
+  // 统计卡片
+  $('statTotal').textContent=fmtMinutes(stats.totalSec);
+  $('statValid').textContent=stats.validCount;
+  $('statSessions').textContent=stats.sessionCount;
+  $('statAvg').textContent=fmtMinutes(stats.avgSec);
+
+  // 本周明细
+  const wr=$('weekRecords');
+  if(stats.sessions.length===0){
+    wr.innerHTML='<div class="record-empty"><div class="icon">📋</div>本周暂无打卡记录</div>';
+  }else{
+    wr.innerHTML=stats.sessions.map(s=>{
+      const d=new Date(s.checkin.timestamp);
+      const validTag=s.valid?'<span class="tag tag-in">有效</span>':'<span class="tag tag-out">无效</span>';
+      const autoTag=s.autoCheckout?' <span class="tag tag-auto">自动签退</span>':'';
+      return '<div class="record-item"><span class="date">'+(d.getMonth()+1)+'/'+d.getDate()+'</span>'+
+        '<span class="time">'+s.checkin.time+'-'+s.checkout.time+' · '+fmtMinutes(s.duration)+'分钟</span>'+
+        validTag+autoTag+'</div>';
+    }).join('');
+  }
+}
+
+// ================================================================
+//  渲染：管理员页
+// ================================================================
+function renderAdminPage(){
+  const loggedIn=sGet(K_ADMIN,false);
+  if(!loggedIn){
+    $('adminLoginView').classList.remove('hidden');
+    $('adminPanelView').classList.add('hidden');
+    return;
+  }
+  $('adminLoginView').classList.add('hidden');
+  $('adminPanelView').classList.remove('hidden');
+  renderAdminRank();
+}
+
+function renderAdminRank(){
+  const refDate=shiftWeek(new Date(),State.adminWeekOffset);
+  const wk=getWeekKey(refDate);
+  $('adminWeekLabel').textContent=getWeekLabel(refDate);
+
+  const readers=getReaders();
+  const records=getRecords();
+  const readerIds=new Set([...Object.keys(readers),...records.map(r=>r.readerId)]);
+
+  const rankings=[];
+  for(const rid of readerIds){
+    const reader=readers[rid]||{realName:'未知',department:'-',studentId:'-'};
+    const stats=getReaderWeekStats(rid,wk);
+    if(stats.sessionCount===0&&stats.totalSec===0)continue;
+    rankings.push({readerId:rid,reader,...stats});
+  }
+  rankings.sort((a,b)=>b.validSec-a.validSec);
+
+  $('rankCount').textContent='（共'+rankings.length+'人）';
+  const rl=$('rankList');
+  if(rankings.length===0){
+    rl.innerHTML='<div class="record-empty"><div class="icon">📊</div>本周暂无打卡数据</div>';
+    return;
+  }
+  rl.innerHTML=rankings.map((r,i)=>{
+    const numCls=i===0?'top1':i===1?'top2':i===2?'top3':'normal';
+    const badge=r.passed?'<span class="rank-badge pass">已达标</span>':'<span class="rank-badge fail">未达标</span>';
+    return '<div class="rank-item" data-rid="'+r.readerId+'">'+
+      '<div class="rank-num '+numCls+'">'+(i+1)+'</div>'+
+      '<div class="rank-info"><div class="r-name">'+r.reader.realName+'</div>'+
+      '<div class="r-detail">'+r.reader.department+' · '+r.reader.studentId+'</div></div>'+
+      '<div class="rank-time"><div class="r-val">'+fmtMinutes(r.validSec)+'</div><div class="r-unit">有效分钟</div>'+badge+'</div></div>';
+  }).join('');
+
+  // 绑定点击
+  rl.querySelectorAll('.rank-item').forEach(el=>{
+    el.addEventListener('click',()=>showReaderDetail(el.dataset.rid,wk));
+  });
+}
+
+function showReaderDetail(readerId,weekKey){
+  const readers=getReaders();
+  const reader=readers[readerId]||{realName:'未知',department:'-',studentId:'-'};
+  const stats=getReaderWeekStats(readerId,weekKey);
+  $('detailTitle').textContent=reader.realName+' 的打卡详情';
+  let html='<div class="user-card"><div class="avatar">'+reader.realName.charAt(0)+'</div>'+
+    '<div class="info"><div class="name">'+reader.realName+'</div>'+
+    '<div class="detail">'+reader.department+' · '+reader.studentId+'</div></div></div>';
+  html+='<div class="stats-grid"><div class="stat-card highlight"><div class="stat-value">'+fmtMinutes(stats.validSec)+'</div><div class="stat-label">有效分钟</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+stats.validCount+'</div><div class="stat-label">有效次数</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+fmtMinutes(stats.totalSec)+'</div><div class="stat-label">总分钟</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+(stats.passed?'✅':'❌')+'</div><div class="stat-label">是否达标</div></div></div>';
+  html+='<div class="section-title">打卡明细</div>';
+  if(stats.sessions.length===0){
+    html+='<div class="record-empty"><div class="icon">📋</div>本周无打卡记录</div>';
+  }else{
+    html+='<div class="record-list">'+stats.sessions.map(s=>{
+      const d=new Date(s.checkin.timestamp);
+      const tag=s.valid?'<span class="tag tag-in">有效</span>':'<span class="tag tag-out">不足30分</span>';
+      const auto=s.autoCheckout?' <span class="tag tag-auto">超范围自动签退</span>':'';
+      return '<div class="record-item"><span class="date">'+(d.getMonth()+1)+'/'+d.getDate()+'</span>'+
+        '<span class="time">'+s.checkin.time+'-'+s.checkout.time+' · '+fmtMinutes(s.duration)+'分</span>'+tag+auto+'</div>';
+    }).join('')+'</div>';
+  }
+  $('detailContent').innerHTML=html;
+  $('detailModal').classList.add('show');
+}
+
+// ================================================================
+//  二维码
+// ================================================================
+let qrInstance=null;
+function generateQR(){
+  const url=window.location.href;
+  $('qrUrl').textContent=url;
+  const box=$('qrcodeCanvas');
+  if(qrInstance){qrInstance.clear();box.innerHTML='';qrInstance=null}
+  if(url.startsWith('file://')){
+    box.innerHTML='<div style="padding:40px;color:var(--gray-400);font-size:13px">部署到服务器后自动生成二维码</div>';
+    return;
+  }
+  try{
+    qrInstance=new QRCode(box,{text:url,width:180,height:180,colorDark:'#1a202c',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
+  }catch(e){box.innerHTML='<div style="padding:20px;color:var(--gray-500);font-size:12px">二维码生成失败</div>'}
+}
+
+function downloadQR(){
+  const canvas=$('qrcodeCanvas').querySelector('canvas');
+  if(!canvas){showToast('二维码未生成','error');return}
+  const link=document.createElement('a');
+  link.download='阅览室打卡二维码.png';
+  link.href=canvas.toDataURL('image/png');
+  link.click();
+  showToast('二维码已下载','success');
+}
+
+// ================================================================
+//  数据导出/导入
+// ================================================================
+function generateExport(){
+  const user=getUser();if(!user){showToast('请先注册','error');return}
+  const records=getRecords().filter(r=>r.readerId===user.readerId);
+  const data={version:1,exportTime:new Date().toISOString(),user,records};
+  $('exportData').value=JSON.stringify(data);
+  showToast('导出数据已生成，请复制','success');
+}
+
+function copyExport(){
+  const ta=$('exportData');
+  if(!ta.value){showToast('请先生成导出数据','warning');return}
+  ta.select();document.execCommand('copy');
+  showToast('已复制到剪贴板','success');
+}
+
+function importData(){
+  const raw=$('importData').value.trim();
+  if(!raw){showToast('请粘贴要导入的数据','warning');return}
+  try{
+    const data=JSON.parse(raw);
+    if(!data.user||!data.records){throw new Error('数据格式不正确')}
+    // 导入读者
+    const readers=getReaders();
+    readers[data.user.readerId]=data.user;
+    sSet(K_READERS,readers);
+    // 导入记录（去重）
+    const all=getRecords();
+    const existIds=new Set(all.map(r=>r.id));
+    let added=0;
+    for(const r of data.records){
+      if(r.id&&!existIds.has(r.id)){all.push(r);existIds.add(r.id);added++}
+    }
+    saveRecords(all);
+    $('importData').value='';
+    showToast('导入成功！新增 '+added+' 条记录','success');
+    renderAdminRank();
+  }catch(e){
+    showToast('导入失败：'+e.message,'error');
+  }
+}
+
+function clearAllData(){
+  if(!confirm('确定要清空所有打卡数据和读者信息吗？此操作不可恢复！'))return;
+  sRemove(K_RECORDS);sRemove(K_READERS);
+  showToast('已清空所有数据','success');
+  renderAdminRank();
+}
+
+// ================================================================
+//  管理员登录/登出
+// ================================================================
+async function adminLogin(e){
+  e.preventDefault();
+  const pwd=$('adminPwd').value;
+  if(!pwd){showToast('请输入密码','warning');return}
+  const hash=await sha256(pwd);
+  if(hash===CONFIG.ADMIN_PASSWORD_HASH){
+    sSet(K_ADMIN,true);
+    $('adminPwd').value='';
+    showToast('登录成功','success');
+    renderAdminPage();
+    generateQR();
+  }else{
+    showToast('密码错误','error');
+  }
+}
+
+function adminLogout(){
+  sRemove(K_ADMIN);
+  showToast('已退出登录','info');
+  renderAdminPage();
+}
+
+async function generateHash(){
+  const pwd=$('newPwdInput').value;
+  if(!pwd){showToast('请输入新密码','warning');return}
+  const hash=await sha256(pwd);
+  $('hashResult').value=hash;
+  showToast('哈希已生成，请复制替换代码中的配置','success');
+}
+
+// ================================================================
+//  页面切换
+// ================================================================
+function switchPage(page){
+  State.currentPage=page;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  $('page-'+page).classList.add('active');
+  document.querySelectorAll('.tab-item').forEach(t=>t.classList.toggle('active',t.dataset.page===page));
+  if(page==='checkin')renderCheckinPage();
+  if(page==='mine')renderMinePage();
+  if(page==='admin'){renderAdminPage();if(sGet(K_ADMIN,false))generateQR()}
+}
+
+// ================================================================
+//  事件绑定
+// ================================================================
+function bindEvents(){
+  // Tab切换
+  document.querySelectorAll('.tab-item').forEach(t=>{
+    t.addEventListener('click',()=>switchPage(t.dataset.page));
+  });
+
+  // 注册
+  $('registerForm').addEventListener('submit',e=>{
+    e.preventDefault();
+    const name=$('regName').value.trim();
+    const dept=$('regDept').value.trim();
+    const sid=$('regSid').value.trim();
+    if(!name||!dept||!sid){showToast('请完整填写信息','error');return}
+    const user={readerId:genReaderId(),realName:name,department:dept,studentId:sid,createdAt:Date.now()};
+    saveUser(user);
+    showToast('🎉 注册成功！欢迎 '+name,'success');
+    $('registerForm').reset();
+    renderCheckinPage();
+  });
+
+  // 切换账号
+  $('switchBtn').addEventListener('click',()=>{
+    if(!confirm('确定切换账号吗？当前打卡记录保留在本设备。'))return;
+    if(State.checkingIn){showToast('请先签退再切换账号','warning');return}
+    clearUser();
+    showToast('已切换，请重新注册','info');
+    renderCheckinPage();
+  });
+
+  // 签到签退
+  $('checkinBtn').addEventListener('click',doCheckin);
+  $('checkoutBtn').addEventListener('click',()=>doCheckout(false));
+
+  // 我的-周切换
+  $('weekPrev').addEventListener('click',()=>{State.mineWeekOffset--;renderMinePage()});
+  $('weekNext').addEventListener('click',()=>{
+    if(State.mineWeekOffset>=0){showToast('已经是本周了','info');return}
+    State.mineWeekOffset++;renderMinePage();
+  });
+
+  // 导出
+  $('genExportBtn').addEventListener('click',generateExport);
+  $('copyExportBtn').addEventListener('click',copyExport);
+
+  // 管理员
+  $('adminLoginForm').addEventListener('submit',adminLogin);
+  $('adminLogoutBtn').addEventListener('click',adminLogout);
+  $('adminWeekPrev').addEventListener('click',()=>{State.adminWeekOffset--;renderAdminRank()});
+  $('adminWeekNext').addEventListener('click',()=>{
+    if(State.adminWeekOffset>=0){showToast('已经是本周了','info');return}
+    State.adminWeekOffset++;renderAdminRank();
+  });
+  $('downloadQrBtn').addEventListener('click',downloadQR);
+  $('importBtn').addEventListener('click',importData);
+  $('clearDataBtn').addEventListener('click',clearAllData);
+  $('genHashBtn').addEventListener('click',generateHash);
+
+  // 详情弹窗
+  $('detailClose').addEventListener('click',()=>$('detailModal').classList.remove('show'));
+  $('detailModal').addEventListener('click',e=>{if(e.target===$('detailModal'))$('detailModal').classList.remove('show')});
+
+  // 页面可见性变化时刷新定位
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)GPS.update()});
+}
+
+// ================================================================
+//  启动
+// ================================================================
+function init(){
+  bindEvents();
+  GPS.init();
+  restoreCheckin();
+  renderCheckinPage();
+  console.log('📖 阅览室打卡系统已启动');
+  console.log('📍 目标坐标:',CONFIG.TARGET_LAT,CONFIG.TARGET_LNG);
+  console.log('📐 允许范围:',CONFIG.ALLOWED_RADIUS,'米');
+  console.log('⏱ 有效规则:单次≥',CONFIG.MIN_SESSION_SECONDS/60,'分钟,周累计≥',CONFIG.WEEKLY_REQUIRED_SECONDS/60,'分钟');
+}
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
